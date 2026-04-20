@@ -1,0 +1,29 @@
+:root {
+  --ui-bg: #f2f5f8;
+  --ui-card: #ffffff;
+  --ui-text: #17212b;
+  --ui-muted: #51606f;
+  --ui-border: #cad5df;
+  --ui-accent: #1f6f8b;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--ui-text);
+  background:
+    radial-gradient(circle at top right, #fff6d6 0%, rgba(255, 246, 214, 0) 38%),
+    radial-gradient(circle at left 30%, #e3f0ff 0%, rgba(227, 240, 255, 0) 42%), var(--ui-bg);
+  line-height: 1.6;
+  font-family: 'Avenir Next', 'Segoe UI', 'Trebuchet MS', sans-serif;
+  font-size: 16px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
