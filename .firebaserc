@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "portfolio-liz"
+  },
+  "targets": {
+    "portfolio-liz": {
+      "hosting": {
+        "workshop": [
+          "workshop-lizbrown5280"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

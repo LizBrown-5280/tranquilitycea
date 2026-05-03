@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import confetti from 'canvas-confetti'
 
 import CanastaHandForm from '@/components/canasta/CanastaHandForm.vue'
 import { scoreCanastaHand } from '@/services/canasta/scoring'
@@ -23,23 +24,21 @@ interface TeamMeta {
 }
 
 const HAND_TABS: HandTabMeta[] = [
-  { id: 'hand1', label: 'Hand 1' },
-  { id: 'hand2', label: 'Hand 2' },
-  { id: 'hand3', label: 'Hand 3' },
-  { id: 'hand4', label: 'Hand 4' },
+  { id: 'hand1', label: '1' },
+  { id: 'hand2', label: '2' },
+  { id: 'hand3', label: '3' },
+  { id: 'hand4', label: '4' },
 ]
 
-const ALL_TABS: Array<{ id: CanastaTabId; label: string }> = [
-  ...HAND_TABS,
-  { id: 'totals', label: 'Totals' },
-]
+const TOTALS_TAB: { id: CanastaTabId; label: string } = { id: 'totals', label: 'Totals' }
 
 const TEAMS: TeamMeta[] = [
-  { id: 'teamA', label: 'Team A' },
-  { id: 'teamB', label: 'Team B' },
+  { id: 'teamA', label: 'Us' },
+  { id: 'teamB', label: 'Them' },
 ]
 
 const activeTab = ref<CanastaTabId>('hand1')
+const confettiPlayed = ref(false)
 
 const handState = ref<Record<HandTabId, Record<CanastaTeamId, CanastaHandInputs>>>(
   HAND_TABS.reduce(
@@ -109,8 +108,81 @@ const leaderSummary = computed(() => {
 
   const leader = TEAMS.find((team) => team.id === leaderTeamId.value)
 
+  if (isGameComplete.value) {
+    return `Congrats! ${leader?.label ?? 'Team'} Won!`
+  }
+
   return `${leader?.label ?? 'Leading team'} leading by ${formatNumber(leadAmount.value)}`
 })
+
+const isGameComplete = computed(() => {
+  if (!leaderTeamId.value) {
+    return false
+  }
+
+  for (const tab of HAND_TABS) {
+    const teamATotal = totalsByHand.value[tab.id].teamA.total
+    const teamBTotal = totalsByHand.value[tab.id].teamB.total
+
+    if (teamATotal === 0 || teamBTotal === 0) {
+      return false
+    }
+  }
+
+  return true
+})
+
+function fireConfetti() {
+  const count = 200
+  const defaults = {
+    origin: { y: 0.7 },
+  }
+
+  function fire(particleRatio: number, opts: any) {
+    ;(confetti as any)(
+      Object.assign({}, defaults, opts, {
+        particleCount: Math.floor(count * particleRatio),
+      }),
+    )
+  }
+
+  fire(0.25, {
+    spread: 26,
+    startVelocity: 55,
+  })
+
+  fire(0.2, {
+    spread: 60,
+  })
+
+  fire(0.35, {
+    spread: 100,
+    decay: 0.91,
+    scalar: 0.8,
+  })
+
+  fire(0.1, {
+    spread: 120,
+    startVelocity: 25,
+    decay: 0.92,
+    scalar: 1.2,
+  })
+
+  fire(0.1, {
+    spread: 120,
+    startVelocity: 45,
+  })
+}
+
+watch(
+  () => ({ isComplete: isGameComplete.value, activeTab: activeTab.value }),
+  ({ isComplete, activeTab: currentTab }) => {
+    if (isComplete && !confettiPlayed.value && currentTab === 'totals') {
+      confettiPlayed.value = true
+      fireConfetti()
+    }
+  },
+)
 
 function setActiveTab(tabId: CanastaTabId) {
   activeTab.value = tabId
@@ -118,6 +190,11 @@ function setActiveTab(tabId: CanastaTabId) {
 
 function updateTeamInputs(handId: HandTabId, teamId: CanastaTeamId, nextValue: CanastaHandInputs) {
   handState.value[handId][teamId] = nextValue
+}
+
+function isWentOutDisabled(handId: HandTabId, teamId: CanastaTeamId): boolean {
+  const opposingTeamId: CanastaTeamId = teamId === 'teamA' ? 'teamB' : 'teamA'
+  return handState.value[handId][opposingTeamId].wentOut
 }
 
 function isLeader(teamId: CanastaTeamId): boolean {
@@ -134,22 +211,33 @@ function formatNumber(value: number): string {
     <header class="canasta-header">
       <p class="eyebrow">Score Tracker</p>
       <h1>Canasta</h1>
-      <p class="intro">
-        Mobile-first hand tracker for two teams. Each hand tab contains Team A and Team B stacked
-        with live totals.
-      </p>
+      <p class="intro">Scoring has never been simpler!</p>
     </header>
 
     <nav class="tab-row" aria-label="Canasta score tabs">
+      <div class="tab-group" aria-label="Hand tabs">
+        <p class="tab-group-title">Hands</p>
+        <div class="hand-pill-row">
+          <button
+            v-for="tab in HAND_TABS"
+            :key="tab.id"
+            type="button"
+            class="tab-pill tab-pill--hand"
+            :class="{ 'tab-pill--active': activeTab === tab.id }"
+            @click="setActiveTab(tab.id)"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+      </div>
+
       <button
-        v-for="tab in ALL_TABS"
-        :key="tab.id"
         type="button"
-        class="tab-pill"
-        :class="{ 'tab-pill--active': activeTab === tab.id }"
-        @click="setActiveTab(tab.id)"
+        class="tab-pill tab-pill--totals"
+        :class="{ 'tab-pill--active': activeTab === TOTALS_TAB.id }"
+        @click="setActiveTab(TOTALS_TAB.id)"
       >
-        {{ tab.label }}
+        {{ TOTALS_TAB.label }}
       </button>
     </nav>
 
@@ -160,22 +248,25 @@ function formatNumber(value: number): string {
         :team-label="team.label"
         :model-value="handState[activeHandTab][team.id]"
         :totals="totalsByHand[activeHandTab][team.id]"
+        :went-out-disabled="isWentOutDisabled(activeHandTab, team.id)"
         @update:model-value="updateTeamInputs(activeHandTab, team.id, $event)"
       />
     </section>
 
     <section v-else class="totals-tab" aria-label="Canasta team totals">
-      <h2>Totals</h2>
-      <p class="totals-help">Hand 1-4 totals and grand total per team.</p>
+      <div class="totals-tab-inner">
+        <h2>Totals</h2>
+        <p class="totals-help">Hand 1-4 totals and grand total per team.</p>
 
-      <div
-        class="leader-banner"
-        :class="{
-          'leader-banner--tie': hasAnyScores && !leaderTeamId,
-          'leader-banner--active': leaderTeamId,
-        }"
-      >
-        {{ leaderSummary }}
+        <div
+          class="leader-banner"
+          :class="{
+            'leader-banner--tie': hasAnyScores && !leaderTeamId,
+            'leader-banner--active': leaderTeamId,
+          }"
+        >
+          {{ leaderSummary }}
+        </div>
       </div>
 
       <div class="totals-table-scroll">
@@ -252,15 +343,39 @@ h1 {
 }
 
 .tab-row {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(88px, 1fr));
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
   gap: 0.5rem;
   overflow-x: auto;
   padding-bottom: 0.2rem;
 }
 
+.tab-group {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.tab-group-title {
+  margin: 0;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ui-muted);
+}
+
+.hand-pill-row {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  min-width: max-content;
+}
+
 .tab-pill {
-  min-height: 44px;
+  min-height: 48px;
   border: 1px solid var(--ui-border);
   border-radius: 999px;
   background: var(--ui-card);
@@ -268,6 +383,20 @@ h1 {
   font-weight: 700;
   padding: 0.35rem 0.75rem;
   white-space: nowrap;
+}
+
+.tab-pill--hand {
+  width: 48px;
+  min-width: 48px;
+  padding: 0;
+  justify-content: center;
+  font-size: 0.98rem;
+}
+
+.tab-pill--totals {
+  flex: 0 0 auto;
+  min-width: 82px;
+  margin-left: auto;
 }
 
 .tab-pill--active {
@@ -392,6 +521,21 @@ tbody th {
 
   .canasta-header {
     padding: 1.4rem;
+  }
+}
+@media screen and (min-width: 1024px) {
+  .canasta-page {
+    max-width: 1120px;
+  }
+
+  .hand-tab-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 1rem;
+  }
+
+  .hand-tab-layout > * {
+    min-width: 0;
   }
 }
 </style>

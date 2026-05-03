@@ -8,11 +8,10 @@ export interface CanastaHandInputs {
   requirementCleans: number
   requirementDirtys: number
   red3s: number
-  row2CleanBooks: number
-  row2DirtyBooks: number
   wentOut: boolean
   fastClean10Books: number
   fastClean5Books: number
+  fastCleanABooks: number
   cardCount: number
   negCount: number
 }
@@ -34,11 +33,10 @@ export function createEmptyCanastaHandInputs(): CanastaHandInputs {
     requirementCleans: 0,
     requirementDirtys: 0,
     red3s: 0,
-    row2CleanBooks: 0,
-    row2DirtyBooks: 0,
     wentOut: false,
     fastClean10Books: 0,
     fastClean5Books: 0,
+    fastCleanABooks: 0,
     cardCount: 0,
     negCount: 0,
   }

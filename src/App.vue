@@ -5,11 +5,7 @@ import { RouterLink, RouterView } from 'vue-router'
 <template>
   <div class="app-shell">
     <header class="site-header">
-      <RouterLink to="/" class="brand">Game Atlas</RouterLink>
-      <nav>
-        <RouterLink to="/">Directory</RouterLink>
-        <RouterLink to="/guildwars2">Guild Wars 2</RouterLink>
-      </nav>
+      <RouterLink to="/" class="brand">TranquilityCea Workshop</RouterLink>
     </header>
 
     <RouterView />
@@ -23,13 +19,6 @@ import { RouterLink, RouterView } from 'vue-router'
 }
 
 .site-header {
-  position: sticky;
-  top: 0.8rem;
-  z-index: 5;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
   padding: 0.8rem 1rem;
   border: 1px solid var(--ui-border);
   border-radius: 14px;
