@@ -33,7 +33,7 @@ const HAND_TABS: HandTabMeta[] = [
 const TOTALS_TAB: { id: CanastaTabId; label: string } = { id: 'totals', label: 'Totals' }
 
 const TEAMS: TeamMeta[] = [
-  { id: 'teamA', label: 'Us' },
+  { id: 'teamA', label: 'We' },
   { id: 'teamB', label: 'Them' },
 ]
 
@@ -112,7 +112,8 @@ const leaderSummary = computed(() => {
     return `Congrats! ${leader?.label ?? 'Team'} Won!`
   }
 
-  return `${leader?.label ?? 'Leading team'} leading by ${formatNumber(leadAmount.value)}`
+  const leadPhrase = leaderTeamId.value === 'teamA' ? "We're leading by" : "They're leading by"
+  return `${leadPhrase} ${formatNumber(leadAmount.value)}`
 })
 
 const isGameComplete = computed(() => {

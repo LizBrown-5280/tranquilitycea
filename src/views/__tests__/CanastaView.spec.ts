@@ -16,7 +16,7 @@ function getTeamForm(wrapper: ReturnType<typeof mount>, teamLabel: string) {
 }
 
 function getWentOutCheckboxes(wrapper: ReturnType<typeof mount>) {
-  const teamAForm = getTeamForm(wrapper, 'Us')
+  const teamAForm = getTeamForm(wrapper, 'We')
   const teamBForm = getTeamForm(wrapper, 'Them')
   const teamACheckbox = teamAForm
     .findAll('label.requirements-toggle')
@@ -35,7 +35,7 @@ function getWentOutCheckboxes(wrapper: ReturnType<typeof mount>) {
 }
 
 function getAllRequirementsCheckboxes(wrapper: ReturnType<typeof mount>) {
-  const teamAForm = getTeamForm(wrapper, 'Us')
+  const teamAForm = getTeamForm(wrapper, 'We')
   const teamBForm = getTeamForm(wrapper, 'Them')
   const teamACheckbox = teamAForm
     .findAll('label.requirements-toggle')
@@ -56,7 +56,7 @@ function getAllRequirementsCheckboxes(wrapper: ReturnType<typeof mount>) {
 function getRequirementInput(
   wrapper: ReturnType<typeof mount>,
   fieldLabel: string,
-  teamLabel = 'Us',
+  teamLabel = 'We',
 ) {
   const form = getTeamForm(wrapper, teamLabel)
   const label = form.findAll('label.field').find((item) => item.find('span').text() === fieldLabel)
@@ -79,7 +79,7 @@ async function setCheckboxChecked(checkbox: DOMWrapper<HTMLInputElement>, checke
   await checkbox.trigger('change')
 }
 
-function getBigCountValue(wrapper: ReturnType<typeof mount>, teamLabel = 'Us') {
+function getBigCountValue(wrapper: ReturnType<typeof mount>, teamLabel = 'We') {
   const form = getTeamForm(wrapper, teamLabel)
   const row = form
     .findAll('.total-row')
@@ -96,7 +96,7 @@ async function setRequirementInputValue(
   wrapper: ReturnType<typeof mount>,
   fieldLabel: string,
   value: string,
-  teamLabel = 'Us',
+  teamLabel = 'We',
 ) {
   const input = getRequirementInput(wrapper, fieldLabel, teamLabel)
   await input.setValue(value)
@@ -168,7 +168,7 @@ describe('CanastaView', () => {
 
   it('keeps point labels out of the inline checkbox titles', async () => {
     const wrapper = mount(CanastaView)
-    const teamAForm = getTeamForm(wrapper, 'Us')
+    const teamAForm = getTeamForm(wrapper, 'We')
     const [teamAWentOutCheckbox] = getWentOutCheckboxes(wrapper)
     const [teamAAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
 
@@ -203,7 +203,7 @@ describe('CanastaView', () => {
 
   it('opens and closes the mobile-friendly info popup', async () => {
     const wrapper = mount(CanastaView)
-    const teamAForm = getTeamForm(wrapper, 'Us')
+    const teamAForm = getTeamForm(wrapper, 'We')
     const trigger = teamAForm.find('[data-tooltip-trigger="canastaCounts"]')
 
     expect(trigger.exists()).toBe(true)
@@ -220,7 +220,7 @@ describe('CanastaView', () => {
 
   it('does not render clean and dirty inputs alongside red 3s box', () => {
     const wrapper = mount(CanastaView)
-    const teamAForm = getTeamForm(wrapper, 'Us')
+    const teamAForm = getTeamForm(wrapper, 'We')
     const red3Box = teamAForm.findAll('.count-group-box').find((el) => el.text().includes('Red 3s'))
 
     expect(red3Box).toBeDefined()
