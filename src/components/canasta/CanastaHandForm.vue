@@ -777,6 +777,10 @@ h5 {
   color: var(--ui-muted);
 }
 
+.requirements-toggle .label-with-total {
+  padding-right: 0.52rem;
+}
+
 .requirements-toggle span {
   display: flex;
 }
