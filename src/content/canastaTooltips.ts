@@ -4,7 +4,7 @@ export const canastaTooltipContent = {
   wentOutFirst:
     "Check this if your team is the first to go out, you'll earn a 200 point bonus added to your Big Count.",
   allRequirementsMet:
-    "Check this if your team meets all the requirements, you'll earn 11,300 points to be added to your Big Count.",
+    "Check this if your team meets all the requirement Canastas. This will total up your requirements automatically and you'll earn 11,300 points to be added to your Big Count.",
   canastaCounts:
     'Count the number of clean and dirty Canasta books your team made, and enter the counts in the respective fields. Each clean book is worth 500 points, and each dirty book is worth 300 points, contributing to your Big Count.\n\nCount any extra 7, 5, and wild Canastas to rack up additional points all contributing to your Big Count.',
   redThrees:

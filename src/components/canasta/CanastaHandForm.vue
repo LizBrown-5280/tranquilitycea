@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { canastaTooltipContent, type CanastaTooltipKey } from '@/content/canastaTooltips'
 import type { CanastaHandInputs, CanastaHandTotals } from '@/types/canasta'
 
@@ -32,6 +32,29 @@ const tooltipFallbackMessage = 'Add tooltip text in src/content/canastaTooltips.
 const cardCountDisplay = ref<string>(formatInputDisplay(props.modelValue.cardCount))
 const penaltyCountDisplay = ref<string>(formatInputDisplay(props.modelValue.penaltyCount))
 const activeTooltip = ref<CanastaTooltipKey | null>(null)
+
+const wentOutFirstTotal = computed(() => (props.modelValue.wentOut ? 200 : 0))
+const allRequirementsMetTotal = computed(() => (props.modelValue.allRequirements ? 11300 : 0))
+const canastaCountsTotal = computed(
+  () =>
+    parseNonNegativeInteger(props.modelValue.requirement7s) * 5000 +
+    parseNonNegativeInteger(props.modelValue.requirement5s) * 3000 +
+    parseNonNegativeInteger(props.modelValue.requirementWilds) * 2500 +
+    parseNonNegativeInteger(props.modelValue.requirementCleans) * 500 +
+    parseNonNegativeInteger(props.modelValue.requirementDirtys) * 300,
+)
+const redThreesTotal = computed(() => {
+  const redThrees = parseNonNegativeInteger(props.modelValue.red3s)
+  return Math.floor(redThrees / 7) * 1000 + (redThrees % 7) * 100
+})
+const fastCountTotal = computed(
+  () =>
+    parseNonNegativeInteger(props.modelValue.fastClean10Books) * 70 +
+    parseNonNegativeInteger(props.modelValue.fastClean5Books) * 35 +
+    parseNonNegativeInteger(props.modelValue.fastCleanABooks) * 140,
+)
+const remainingCountTotal = computed(() => parseNonNegativeInteger(props.modelValue.cardCount))
+const cardsNotPlayedTotal = computed(() => parseNonNegativeInteger(props.modelValue.penaltyCount))
 
 function parseNonNegativeInteger(rawValue: string | number | null | undefined): number {
   const parsed = Number(rawValue)
@@ -152,17 +175,20 @@ function closeTooltip() {
             type="checkbox"
             @change="onToggleWentOut(($event.target as HTMLInputElement).checked)"
           />
-          <span class="title-with-info title-with-info--inline">
-            <span>Went Out First</span>
-            <button
-              type="button"
-              class="info-button"
-              aria-label="Show Went Out First info"
-              data-tooltip-trigger="wentOutFirst"
-              @click.stop.prevent="openTooltip('wentOutFirst')"
-            >
-              i
-            </button>
+          <span class="label-with-total">
+            <span class="title-with-info title-with-info--inline">
+              <span>Went Out First</span>
+              <button
+                type="button"
+                class="info-button"
+                aria-label="Show Went Out First info"
+                data-tooltip-trigger="wentOutFirst"
+                @click.stop.prevent="openTooltip('wentOutFirst')"
+              >
+                i
+              </button>
+            </span>
+            <strong class="label-total">({{ formatNumber(wentOutFirstTotal) }})</strong>
           </span>
         </label>
         <label class="requirements-toggle">
@@ -171,32 +197,38 @@ function closeTooltip() {
             type="checkbox"
             @change="onToggleAllRequirements(($event.target as HTMLInputElement).checked)"
           />
-          <span class="title-with-info title-with-info--inline">
-            <span>All Requirements Met</span>
-            <button
-              type="button"
-              class="info-button"
-              aria-label="Show All Requirements Met info"
-              data-tooltip-trigger="allRequirementsMet"
-              @click.stop.prevent="openTooltip('allRequirementsMet')"
-            >
-              i
-            </button>
+          <span class="label-with-total">
+            <span class="title-with-info title-with-info--inline">
+              <span>All Requirements Met</span>
+              <button
+                type="button"
+                class="info-button"
+                aria-label="Show All Requirements Met info"
+                data-tooltip-trigger="allRequirementsMet"
+                @click.stop.prevent="openTooltip('allRequirementsMet')"
+              >
+                i
+              </button>
+            </span>
+            <strong class="label-total">({{ formatNumber(allRequirementsMetTotal) }})</strong>
           </span>
         </label>
 
         <div class="count-group-box">
-          <h5 class="book-counts-heading title-with-info">
-            <span>Canasta Counts</span>
-            <button
-              type="button"
-              class="info-button"
-              aria-label="Show Canasta Counts info"
-              data-tooltip-trigger="canastaCounts"
-              @click="openTooltip('canastaCounts')"
-            >
-              i
-            </button>
+          <h5 class="book-counts-heading label-with-total">
+            <span class="title-with-info">
+              <span>Canasta Counts</span>
+              <button
+                type="button"
+                class="info-button"
+                aria-label="Show Canasta Counts info"
+                data-tooltip-trigger="canastaCounts"
+                @click="openTooltip('canastaCounts')"
+              >
+                i
+              </button>
+            </span>
+            <strong class="label-total">({{ formatNumber(canastaCountsTotal) }})</strong>
           </h5>
 
           <div class="requirements-grid requirements-grid--row1">
@@ -272,17 +304,20 @@ function closeTooltip() {
 
       <div class="subsection-block">
         <div class="count-group-box">
-          <h5 class="title-with-info">
-            <span>Red 3s</span>
-            <button
-              type="button"
-              class="info-button"
-              aria-label="Show Red 3s info"
-              data-tooltip-trigger="redThrees"
-              @click="openTooltip('redThrees')"
-            >
-              i
-            </button>
+          <h5 class="label-with-total">
+            <span class="title-with-info">
+              <span>Red 3s</span>
+              <button
+                type="button"
+                class="info-button"
+                aria-label="Show Red 3s info"
+                data-tooltip-trigger="redThrees"
+                @click="openTooltip('redThrees')"
+              >
+                i
+              </button>
+            </span>
+            <strong class="label-total">({{ formatNumber(redThreesTotal) }})</strong>
           </h5>
           <div class="face-value-row">
             <label class="field">
@@ -316,17 +351,20 @@ function closeTooltip() {
       <div class="face-value-grid">
         <div class="subsection-block subsection-block--fast-count">
           <div class="count-group-box">
-            <h5 class="h5--red title-with-info">
-              <span>Fast Count</span>
-              <button
-                type="button"
-                class="info-button info-button--red"
-                aria-label="Show Fast Count info"
-                data-tooltip-trigger="fastCount"
-                @click="openTooltip('fastCount')"
-              >
-                i
-              </button>
+            <h5 class="label-with-total">
+              <span class="title-with-info h5--red">
+                <span>Fast Count</span>
+                <button
+                  type="button"
+                  class="info-button info-button--red"
+                  aria-label="Show Fast Count info"
+                  data-tooltip-trigger="fastCount"
+                  @click="openTooltip('fastCount')"
+                >
+                  i
+                </button>
+              </span>
+              <strong class="label-total">({{ formatNumber(fastCountTotal) }})</strong>
             </h5>
             <div class="face-value-row">
               <label class="field">
@@ -374,17 +412,20 @@ function closeTooltip() {
 
         <div class="subsection-block subsection-block--card-row">
           <div class="count-group-box">
-            <h5 class="title-with-info">
-              <span>Remaining Count</span>
-              <button
-                type="button"
-                class="info-button"
-                aria-label="Show Remaining Count info"
-                data-tooltip-trigger="remainingCount"
-                @click="openTooltip('remainingCount')"
-              >
-                i
-              </button>
+            <h5 class="label-with-total">
+              <span class="title-with-info">
+                <span>Remaining Count</span>
+                <button
+                  type="button"
+                  class="info-button"
+                  aria-label="Show Remaining Count info"
+                  data-tooltip-trigger="remainingCount"
+                  @click="openTooltip('remainingCount')"
+                >
+                  i
+                </button>
+              </span>
+              <strong class="label-total">({{ formatNumber(remainingCountTotal) }})</strong>
             </h5>
             <div class="face-value-row">
               <label class="field">
@@ -420,17 +461,20 @@ function closeTooltip() {
       </h4>
       <div class="subsection-block">
         <div class="count-group-box">
-          <h5 class="title-with-info">
-            <span>Cards Not Played</span>
-            <button
-              type="button"
-              class="info-button"
-              aria-label="Show Cards Not Played info"
-              data-tooltip-trigger="cardsNotPlayed"
-              @click="openTooltip('cardsNotPlayed')"
-            >
-              i
-            </button>
+          <h5 class="label-with-total">
+            <span class="title-with-info">
+              <span>Cards Not Played</span>
+              <button
+                type="button"
+                class="info-button"
+                aria-label="Show Cards Not Played info"
+                data-tooltip-trigger="cardsNotPlayed"
+                @click="openTooltip('cardsNotPlayed')"
+              >
+                i
+              </button>
+            </span>
+            <strong class="label-total">({{ formatNumber(cardsNotPlayedTotal) }})</strong>
           </h5>
           <div class="face-value-row">
             <label class="field">
@@ -572,6 +616,22 @@ h5 {
 
 .title-with-info--section {
   justify-content: flex-start;
+}
+
+.label-with-total {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.label-total {
+  margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #94a3b8;
 }
 
 .h5--red {
@@ -719,10 +779,6 @@ h5 {
 
 .requirements-toggle span {
   display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  flex: 1;
-  min-width: 0;
 }
 
 .requirements-toggle span.title-with-info--inline {
@@ -737,7 +793,7 @@ h5 {
 .requirements-toggle strong {
   margin-left: auto;
   text-align: right;
-  color: var(--ui-text);
+  color: #94a3b8;
 }
 
 .face-value-grid {
