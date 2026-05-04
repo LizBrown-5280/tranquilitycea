@@ -22,7 +22,7 @@ const tooltipLabels: Record<CanastaTooltipKey, string> = {
   redThrees: 'Red 3s',
   cardCount: 'Card Count',
   fastCount: 'Fast Count',
-  remainingCount: 'Remaining Count',
+  remainingCount: 'Remaining Cards',
   penaltyCount: 'Penalty Count',
   cardsNotPlayed: 'Cards Not Played',
 }
@@ -414,11 +414,11 @@ function closeTooltip() {
           <div class="count-group-box">
             <h5 class="label-with-total">
               <span class="title-with-info">
-                <span>Remaining Count</span>
+                <span>Remaining Cards</span>
                 <button
                   type="button"
                   class="info-button"
-                  aria-label="Show Remaining Count info"
+                  aria-label="Show Remaining Cards info"
                   data-tooltip-trigger="remainingCount"
                   @click="openTooltip('remainingCount')"
                 >
