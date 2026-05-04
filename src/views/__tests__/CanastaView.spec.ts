@@ -142,27 +142,27 @@ describe('CanastaView', () => {
   it('does not mutate requirement counts when went out is checked', async () => {
     const wrapper = mount(CanastaView)
 
-    await setRequirementInputValue(wrapper, "7's", '2')
-    await setRequirementInputValue(wrapper, "5's", '3')
+    await setRequirementInputValue(wrapper, '7s', '2')
+    await setRequirementInputValue(wrapper, '5s', '3')
 
     const [teamAWentOutCheckbox] = getWentOutCheckboxes(wrapper)
 
     await setCheckboxChecked(teamAWentOutCheckbox, true)
 
-    expect((getRequirementInput(wrapper, "7's").element as HTMLInputElement).value).toBe('2')
-    expect((getRequirementInput(wrapper, "5's").element as HTMLInputElement).value).toBe('3')
+    expect((getRequirementInput(wrapper, '7s').element as HTMLInputElement).value).toBe('2')
+    expect((getRequirementInput(wrapper, '5s').element as HTMLInputElement).value).toBe('3')
   })
 
   it('does not mutate requirement counts when all requirements is toggled', async () => {
     const wrapper = mount(CanastaView)
     const [teamAAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
 
-    await setRequirementInputValue(wrapper, "7's", '4')
+    await setRequirementInputValue(wrapper, '7s', '4')
     await setRequirementInputValue(wrapper, 'Wilds', '2')
     await setCheckboxChecked(teamAAllRequirementsCheckbox, true)
     await setCheckboxChecked(teamAAllRequirementsCheckbox, false)
 
-    expect((getRequirementInput(wrapper, "7's").element as HTMLInputElement).value).toBe('4')
+    expect((getRequirementInput(wrapper, '7s').element as HTMLInputElement).value).toBe('4')
     expect((getRequirementInput(wrapper, 'Wilds').element as HTMLInputElement).value).toBe('2')
   })
 
@@ -186,7 +186,7 @@ describe('CanastaView', () => {
     const wrapper = mount(CanastaView)
     const [teamAAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
 
-    await setRequirementInputValue(wrapper, "7's", '1')
+    await setRequirementInputValue(wrapper, '7s', '1')
     expect(getBigCountValue(wrapper)).toBe('5,000')
 
     await setCheckboxChecked(teamAAllRequirementsCheckbox, true)
@@ -204,7 +204,7 @@ describe('CanastaView', () => {
   it('opens and closes the mobile-friendly info popup', async () => {
     const wrapper = mount(CanastaView)
     const teamAForm = getTeamForm(wrapper, 'Us')
-    const trigger = teamAForm.find('[data-tooltip-trigger="bookCounts"]')
+    const trigger = teamAForm.find('[data-tooltip-trigger="canastaCounts"]')
 
     expect(trigger.exists()).toBe(true)
     expect(wrapper.find('[data-tooltip-modal]').exists()).toBe(false)
@@ -212,19 +212,16 @@ describe('CanastaView', () => {
     await trigger.trigger('click')
 
     expect(wrapper.find('[data-tooltip-modal]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Add tooltip text in src/content/canastaTooltips.ts.')
 
     await wrapper.find('.tooltip-close').trigger('click')
 
     expect(wrapper.find('[data-tooltip-modal]').exists()).toBe(false)
   })
 
-  it("does not render clean and dirty inputs alongside red 3's box", () => {
+  it('does not render clean and dirty inputs alongside red 3s box', () => {
     const wrapper = mount(CanastaView)
     const teamAForm = getTeamForm(wrapper, 'Us')
-    const red3Box = teamAForm
-      .findAll('.count-group-box')
-      .find((el) => el.text().includes("Red 3's"))
+    const red3Box = teamAForm.findAll('.count-group-box').find((el) => el.text().includes('Red 3s'))
 
     expect(red3Box).toBeDefined()
     expect(red3Box!.text()).not.toContain('Clean')

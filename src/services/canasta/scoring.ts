@@ -49,13 +49,13 @@ export function scoreCanastaHand(inputs: CanastaHandInputs): CanastaHandTotals {
     requirementsSubtotal(inputs) + allRequirementsBonus(inputs) + secondRowSubtotal(inputs)
   const fastCount = fastCountSubtotal(inputs)
   const cardCount = clampNonNegativeInteger(inputs.cardCount)
-  const negCount = clampNonNegativeInteger(inputs.negCount)
+  const penaltyCount = clampNonNegativeInteger(inputs.penaltyCount)
 
   return {
     bigCount,
     fastCount,
     cardCount,
-    negCount,
-    total: bigCount + fastCount + cardCount - negCount,
+    penaltyCount,
+    total: bigCount + fastCount + cardCount - penaltyCount,
   }
 }

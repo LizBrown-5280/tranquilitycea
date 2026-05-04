@@ -13,14 +13,14 @@ export interface CanastaHandInputs {
   fastClean5Books: number
   fastCleanABooks: number
   cardCount: number
-  negCount: number
+  penaltyCount: number
 }
 
 export interface CanastaHandTotals {
   bigCount: number
   fastCount: number
   cardCount: number
-  negCount: number
+  penaltyCount: number
   total: number
 }
 
@@ -38,6 +38,6 @@ export function createEmptyCanastaHandInputs(): CanastaHandInputs {
     fastClean5Books: 0,
     fastCleanABooks: 0,
     cardCount: 0,
-    negCount: 0,
+    penaltyCount: 0,
   }
 }

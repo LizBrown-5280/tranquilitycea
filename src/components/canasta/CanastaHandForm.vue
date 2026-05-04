@@ -18,18 +18,19 @@ const tooltipLabels: Record<CanastaTooltipKey, string> = {
   bigCount: 'Big Count',
   wentOutFirst: 'Went Out First',
   allRequirementsMet: 'All Requirements Met',
-  bookCounts: 'Canasta Counts',
-  redThrees: "Red 3's",
+  canastaCounts: 'Canasta Counts',
+  redThrees: 'Red 3s',
   cardCount: 'Card Count',
   fastCount: 'Fast Count',
   remainingCount: 'Remaining Count',
-  negCount: 'Neg Count',
+  penaltyCount: 'Penalty Count',
+  cardsNotPlayed: 'Cards Not Played',
 }
 
 const tooltipFallbackMessage = 'Add tooltip text in src/content/canastaTooltips.ts.'
 
 const cardCountDisplay = ref<string>(formatInputDisplay(props.modelValue.cardCount))
-const negCountDisplay = ref<string>(formatInputDisplay(props.modelValue.negCount))
+const penaltyCountDisplay = ref<string>(formatInputDisplay(props.modelValue.penaltyCount))
 const activeTooltip = ref<CanastaTooltipKey | null>(null)
 
 function parseNonNegativeInteger(rawValue: string | number | null | undefined): number {
@@ -81,18 +82,18 @@ function formatNumber(value: number): string {
   return value.toLocaleString('en-US')
 }
 
-function onCardCountInput(event: Event, field: 'cardCount' | 'negCount') {
+function onCardCountInput(event: Event, field: 'cardCount' | 'penaltyCount') {
   const target = event.target as HTMLInputElement
   const cleanedValue = target.value.replace(/,/g, '')
   onNumberInput(field, cleanedValue)
   if (field === 'cardCount') {
     cardCountDisplay.value = cleanedValue
   } else {
-    negCountDisplay.value = cleanedValue
+    penaltyCountDisplay.value = cleanedValue
   }
 }
 
-function onCardCountBlur(event: Event, field: 'cardCount' | 'negCount') {
+function onCardCountBlur(event: Event, field: 'cardCount' | 'penaltyCount') {
   const target = event.target as HTMLInputElement
   const cleanedValue = target.value.replace(/,/g, '')
   const value = parseNonNegativeInteger(cleanedValue)
@@ -100,19 +101,19 @@ function onCardCountBlur(event: Event, field: 'cardCount' | 'negCount') {
   if (field === 'cardCount') {
     cardCountDisplay.value = formatted
   } else {
-    negCountDisplay.value = formatted
+    penaltyCountDisplay.value = formatted
   }
   target.value = formatted
 }
 
-function onCardCountFocus(event: Event, field: 'cardCount' | 'negCount') {
+function onCardCountFocus(event: Event, field: 'cardCount' | 'penaltyCount') {
   const target = event.target as HTMLInputElement
   const cleanedValue = target.value.replace(/,/g, '')
   target.value = cleanedValue
   if (field === 'cardCount') {
     cardCountDisplay.value = cleanedValue
   } else {
-    negCountDisplay.value = cleanedValue
+    penaltyCountDisplay.value = cleanedValue
   }
 }
 
@@ -191,8 +192,8 @@ function closeTooltip() {
               type="button"
               class="info-button"
               aria-label="Show Canasta Counts info"
-              data-tooltip-trigger="bookCounts"
-              @click="openTooltip('bookCounts')"
+              data-tooltip-trigger="canastaCounts"
+              @click="openTooltip('canastaCounts')"
             >
               i
             </button>
@@ -200,7 +201,7 @@ function closeTooltip() {
 
           <div class="requirements-grid requirements-grid--row1">
             <label class="field">
-              <span>7&#39;s</span>
+              <span>7s</span>
               <input
                 class="book-value-input"
                 :value="formatInputDisplay(modelValue.requirement7s)"
@@ -212,7 +213,7 @@ function closeTooltip() {
               />
             </label>
             <label class="field">
-              <span>5&#39;s</span>
+              <span>5s</span>
               <input
                 class="book-value-input"
                 :value="formatInputDisplay(modelValue.requirement5s)"
@@ -272,11 +273,11 @@ function closeTooltip() {
       <div class="subsection-block">
         <div class="count-group-box">
           <h5 class="title-with-info">
-            <span>Red 3's</span>
+            <span>Red 3s</span>
             <button
               type="button"
               class="info-button"
-              aria-label="Show Red 3's info"
+              aria-label="Show Red 3s info"
               data-tooltip-trigger="redThrees"
               @click="openTooltip('redThrees')"
             >
@@ -355,7 +356,7 @@ function closeTooltip() {
                 />
               </label>
               <label class="field">
-                <span>A's</span>
+                <span>As</span>
                 <input
                   class="book-value-input"
                   :value="formatInputDisplay(modelValue.fastCleanABooks)"
@@ -406,30 +407,42 @@ function closeTooltip() {
 
     <div class="section-block">
       <h4 class="title-with-info title-with-info--section">
-        <span>Neg Count</span>
+        <span>Penalty Count</span>
         <button
           type="button"
           class="info-button"
-          aria-label="Show Neg Count info"
-          data-tooltip-trigger="negCount"
-          @click="openTooltip('negCount')"
+          aria-label="Show Penalty Count info"
+          data-tooltip-trigger="penaltyCount"
+          @click="openTooltip('penaltyCount')"
         >
           i
         </button>
       </h4>
       <div class="subsection-block">
         <div class="count-group-box">
+          <h5 class="title-with-info">
+            <span>Cards Not Played</span>
+            <button
+              type="button"
+              class="info-button"
+              aria-label="Show Cards Not Played info"
+              data-tooltip-trigger="cardsNotPlayed"
+              @click="openTooltip('cardsNotPlayed')"
+            >
+              i
+            </button>
+          </h5>
           <div class="face-value-row">
             <label class="field">
               <input
                 class="card-count-input"
-                :value="negCountDisplay"
+                :value="penaltyCountDisplay"
                 type="text"
                 inputmode="numeric"
                 min="0"
-                @input="onCardCountInput($event, 'negCount')"
-                @blur="onCardCountBlur($event, 'negCount')"
-                @focus="onCardCountFocus($event, 'negCount')"
+                @input="onCardCountInput($event, 'penaltyCount')"
+                @blur="onCardCountBlur($event, 'penaltyCount')"
+                @focus="onCardCountFocus($event, 'penaltyCount')"
               />
             </label>
           </div>
@@ -482,10 +495,10 @@ function closeTooltip() {
           </div>
         </div>
         <div class="total-row">
-          <span>Neg Count</span>
+          <span>Penalty Count</span>
           <div class="total-value-group">
             <span class="total-operator">−</span>
-            <strong class="total-value">{{ formatNumber(totals.negCount) }}</strong>
+            <strong class="total-value">{{ formatNumber(totals.penaltyCount) }}</strong>
           </div>
         </div>
         <div class="total-row total-row--emphasis">
