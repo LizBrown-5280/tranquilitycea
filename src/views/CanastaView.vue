@@ -1,17 +1,37 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import confetti from 'canvas-confetti'
 
 import CanastaHandForm from '@/components/canasta/CanastaHandForm.vue'
+import {
+  getCurrentSession,
+  getPreviousSessions,
+  sortSessionsByNewest,
+  isSessionEmpty,
+  formatSessionLabel,
+} from '@/services/canasta/sessionHelpers'
 import { scoreCanastaHand } from '@/services/canasta/scoring'
 import {
+  deleteAllSessions,
+  deleteSession,
+  loadAllSessions,
+  pruneExpiredSessions,
+  saveSession,
+  getSessionRetentionDays,
+  setSessionRetentionDays,
+  getTooltipsEnabled,
+  setTooltipsEnabled,
+} from '@/services/canasta/sessionStorage'
+import {
+  createEmptyCanastaSessionEnvelope,
   createEmptyCanastaHandInputs,
   type CanastaHandInputs,
+  type CanastaSessionEnvelope,
+  type CanastaSessionType,
+  type CanastaTabId,
   type CanastaTeamId,
+  type HandTabId,
 } from '@/types/canasta'
-
-type HandTabId = 'hand1' | 'hand2' | 'hand3' | 'hand4'
-type CanastaTabId = HandTabId | 'totals'
 
 interface HandTabMeta {
   id: HandTabId
@@ -37,11 +57,14 @@ const TEAMS: TeamMeta[] = [
   { id: 'teamB', label: 'Them' },
 ]
 
-const activeTab = ref<CanastaTabId>('hand1')
-const confettiPlayed = ref(false)
+const SESSION_TYPE_OPTIONS: Array<{ id: CanastaSessionType; label: string }> = [
+  { id: 'myTeamOnly', label: "My Team Full Scoring + Opponent's Totals" },
+  { id: 'bothTeams', label: 'Both Teams Full Scoring' },
+  { id: 'totalScoresOnly', label: 'Both Teams Totals Only' },
+]
 
-const handState = ref<Record<HandTabId, Record<CanastaTeamId, CanastaHandInputs>>>(
-  HAND_TABS.reduce(
+function createDefaultHandState(): Record<HandTabId, Record<CanastaTeamId, CanastaHandInputs>> {
+  return HAND_TABS.reduce(
     (accumulator, tab) => {
       accumulator[tab.id] = {
         teamA: createEmptyCanastaHandInputs(),
@@ -50,8 +73,76 @@ const handState = ref<Record<HandTabId, Record<CanastaTeamId, CanastaHandInputs>
       return accumulator
     },
     {} as Record<HandTabId, Record<CanastaTeamId, CanastaHandInputs>>,
-  ),
-)
+  )
+}
+
+function cloneHandState(
+  source: Record<HandTabId, Record<CanastaTeamId, CanastaHandInputs>>,
+): Record<HandTabId, Record<CanastaTeamId, CanastaHandInputs>> {
+  return JSON.parse(JSON.stringify(source)) as Record<
+    HandTabId,
+    Record<CanastaTeamId, CanastaHandInputs>
+  >
+}
+
+const activeTab = ref<CanastaTabId>('hand1')
+const confettiPlayed = ref(false)
+const sessionChooserState = ref<'showing' | 'hidden'>('showing')
+const sessionTypeModalState = ref<'showing' | 'hidden'>('hidden')
+const settingsPanelState = ref<'showing' | 'hidden'>('hidden')
+const retentionDays = ref<number>(90)
+const tooltipsEnabled = ref<boolean>(true)
+const selectedSessionType = ref<CanastaSessionType>('bothTeams')
+const selectedPreviousSessionId = ref('')
+const isArchivedReadOnly = ref(false)
+const allStoredSessions = ref<CanastaSessionEnvelope[]>([])
+const activeSession = ref<CanastaSessionEnvelope | null>(null)
+
+const handState =
+  ref<Record<HandTabId, Record<CanastaTeamId, CanastaHandInputs>>>(createDefaultHandState())
+
+const currentSessionOption = computed(() => getCurrentSession(allStoredSessions.value))
+const previousSessionOptions = computed(() => getPreviousSessions(allStoredSessions.value))
+const currentSessionType = computed<CanastaSessionType>(() => {
+  return activeSession.value?.sessionType ?? 'bothTeams'
+})
+const activeSessionTypeLabel = computed(() => {
+  const sessionType = activeSession.value?.sessionType
+  return SESSION_TYPE_OPTIONS.find((option) => option.id === sessionType)?.label ?? ''
+})
+
+function refreshStoredSessions() {
+  allStoredSessions.value = sortSessionsByNewest(loadAllSessions())
+}
+
+function hydrateFromSession(session: CanastaSessionEnvelope, readOnly = false) {
+  activeSession.value = session
+  activeTab.value = session.activeTab
+  handState.value = cloneHandState(session.handState)
+  isArchivedReadOnly.value = readOnly
+  confettiPlayed.value = false
+  sessionChooserState.value = 'hidden'
+}
+
+function initializeSessionChooser() {
+  pruneExpiredSessions()
+  for (const session of loadAllSessions()) {
+    if (isSessionEmpty(session)) {
+      deleteSession(session.sessionId)
+    }
+  }
+  refreshStoredSessions()
+  sessionChooserState.value = 'showing'
+  sessionTypeModalState.value = 'hidden'
+  selectedPreviousSessionId.value = ''
+  isArchivedReadOnly.value = false
+}
+
+onMounted(() => {
+  initializeSessionChooser()
+  retentionDays.value = getSessionRetentionDays()
+  tooltipsEnabled.value = getTooltipsEnabled()
+})
 
 const activeHandTab = computed<HandTabId | null>(() => {
   return activeTab.value === 'totals' ? null : activeTab.value
@@ -187,10 +278,41 @@ watch(
 
 function setActiveTab(tabId: CanastaTabId) {
   activeTab.value = tabId
+  if (!activeSession.value || isArchivedReadOnly.value) {
+    return
+  }
+
+  activeSession.value = {
+    ...activeSession.value,
+    activeTab: tabId,
+    handState: cloneHandState(handState.value),
+    updatedAt: Date.now(),
+  }
+  saveSession(activeSession.value)
+  refreshStoredSessions()
 }
 
 function updateTeamInputs(handId: HandTabId, teamId: CanastaTeamId, nextValue: CanastaHandInputs) {
+  if (isArchivedReadOnly.value) {
+    return
+  }
+
   handState.value[handId][teamId] = nextValue
+}
+
+function persistHandState() {
+  if (!activeSession.value || isArchivedReadOnly.value) {
+    return
+  }
+
+  activeSession.value = {
+    ...activeSession.value,
+    activeTab: activeTab.value,
+    handState: cloneHandState(handState.value),
+    updatedAt: Date.now(),
+  }
+  saveSession(activeSession.value)
+  refreshStoredSessions()
 }
 
 function isWentOutDisabled(handId: HandTabId, teamId: CanastaTeamId): boolean {
@@ -205,107 +327,392 @@ function isLeader(teamId: CanastaTeamId): boolean {
 function formatNumber(value: number): string {
   return value.toLocaleString('en-US')
 }
+
+function openNewSessionModal() {
+  selectedSessionType.value = 'bothTeams'
+  sessionTypeModalState.value = 'showing'
+}
+
+function closeNewSessionModal() {
+  sessionTypeModalState.value = 'hidden'
+}
+
+function createNewSession() {
+  const newSession = createEmptyCanastaSessionEnvelope(selectedSessionType.value)
+  saveSession(newSession)
+  refreshStoredSessions()
+  hydrateFromSession(newSession)
+  closeNewSessionModal()
+}
+
+function loadCurrentSession() {
+  if (!currentSessionOption.value) {
+    return
+  }
+
+  hydrateFromSession(currentSessionOption.value)
+}
+
+function loadPreviousSession() {
+  const sessionId = Number(selectedPreviousSessionId.value)
+  if (!Number.isFinite(sessionId) || sessionId <= 0) {
+    return
+  }
+
+  const selectedSession = previousSessionOptions.value.find(
+    (session) => session.sessionId === sessionId,
+  )
+  if (!selectedSession) {
+    return
+  }
+
+  hydrateFromSession(selectedSession, true)
+}
+
+function showSessionChooser() {
+  initializeSessionChooser()
+}
+
+function openSettingsPanel() {
+  settingsPanelState.value = 'showing'
+}
+
+function closeSettingsPanel() {
+  settingsPanelState.value = 'hidden'
+}
+
+function onRetentionDaysChange(days: number) {
+  retentionDays.value = setSessionRetentionDays(days)
+}
+
+watch(tooltipsEnabled, (value) => {
+  setTooltipsEnabled(value)
+})
+
+function clearAllStoredSessions() {
+  const shouldDelete =
+    typeof window.confirm === 'function'
+      ? window.confirm('Delete all stored Canasta sessions?')
+      : true
+  if (!shouldDelete) {
+    return
+  }
+
+  deleteAllSessions()
+  activeSession.value = null
+  activeTab.value = 'hand1'
+  handState.value = createDefaultHandState()
+  initializeSessionChooser()
+}
 </script>
 
 <template>
   <main class="canasta-page">
     <header class="canasta-header">
-      <p class="eyebrow">Score Tracker</p>
-      <h1>Canasta</h1>
-      <p class="intro">Scoring has never been simpler!</p>
-    </header>
-
-    <nav class="tab-row" aria-label="Canasta score tabs">
-      <div class="tab-group" aria-label="Hand tabs">
-        <p class="tab-group-title">Hands</p>
-        <div class="hand-pill-row">
+      <div class="header-top-row">
+        <p class="eyebrow">Score Tracker</p>
+        <div class="session-controls">
           <button
-            v-for="tab in HAND_TABS"
-            :key="tab.id"
+            v-if="sessionChooserState === 'hidden'"
             type="button"
-            class="tab-pill tab-pill--hand"
-            :class="{ 'tab-pill--active': activeTab === tab.id }"
-            @click="setActiveTab(tab.id)"
+            class="back-to-chooser"
+            aria-label="Back to sessions"
+            data-test="back-to-chooser-button"
+            @click="showSessionChooser"
           >
-            {{ tab.label }}
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path
+                d="M12 3.2L3 10.5h2v9.3h5.6v-5.7h2.8v5.7H19v-9.3h2L12 3.2z"
+                fill="currentColor"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="settings-button"
+            aria-label="Open settings"
+            data-test="settings-button"
+            @click="openSettingsPanel"
+          >
+            ⚙
           </button>
         </div>
       </div>
+      <h1>Canasta</h1>
+      <p class="intro">Scoring has never been simpler!</p>
 
-      <button
-        type="button"
-        class="tab-pill tab-pill--totals"
-        :class="{ 'tab-pill--active': activeTab === TOTALS_TAB.id }"
-        @click="setActiveTab(TOTALS_TAB.id)"
-      >
-        {{ TOTALS_TAB.label }}
-      </button>
-    </nav>
+      <p v-if="activeSessionTypeLabel && sessionChooserState === 'hidden'" class="session-meta">
+        Mode: {{ activeSessionTypeLabel }}
+      </p>
 
-    <section v-if="activeHandTab" class="hand-tab-layout">
-      <CanastaHandForm
-        v-for="team in TEAMS"
-        :key="`${activeHandTab}-${team.id}`"
-        :team-label="team.label"
-        :model-value="handState[activeHandTab][team.id]"
-        :totals="totalsByHand[activeHandTab][team.id]"
-        :went-out-disabled="isWentOutDisabled(activeHandTab, team.id)"
-        @update:model-value="updateTeamInputs(activeHandTab, team.id, $event)"
-      />
-    </section>
+      <p v-if="isArchivedReadOnly && sessionChooserState === 'hidden'" class="readonly-badge">
+        Archived Session (Read-Only)
+      </p>
+    </header>
 
-    <section v-else class="totals-tab" aria-label="Canasta team totals">
-      <div class="totals-tab-inner">
-        <h2>Totals</h2>
-        <p class="totals-help">Hand 1-4 totals and grand total per team.</p>
+    <section
+      v-if="settingsPanelState === 'showing'"
+      class="session-modal-overlay"
+      data-test="settings-panel"
+    >
+      <div class="session-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <h3 id="settings-title">Settings</h3>
 
-        <div
-          class="leader-banner"
-          :class="{
-            'leader-banner--tie': hasAnyScores && !leaderTeamId,
-            'leader-banner--active': leaderTeamId,
-          }"
-        >
-          {{ leaderSummary }}
+        <div class="settings-fields">
+          <label class="settings-field" for="settings-retention-days">
+            <span class="settings-field__label">Keep history for</span>
+            <select
+              id="settings-retention-days"
+              :value="retentionDays"
+              data-test="settings-retention-select"
+              @change="onRetentionDaysChange(Number(($event.target as HTMLSelectElement).value))"
+            >
+              <option :value="7">7 days</option>
+              <option :value="30">30 days</option>
+              <option :value="60">60 days</option>
+              <option :value="90">90 days</option>
+              <option :value="180">180 days</option>
+              <option :value="365">1 year</option>
+            </select>
+          </label>
+
+          <label class="settings-field settings-field--toggle" for="settings-tooltips-enabled">
+            <span class="settings-field__label">Show scoring tips</span>
+            <input
+              id="settings-tooltips-enabled"
+              v-model="tooltipsEnabled"
+              type="checkbox"
+              data-test="settings-tooltips-toggle"
+            />
+          </label>
+        </div>
+
+        <div class="session-modal-actions">
+          <button
+            type="button"
+            class="chooser-button chooser-button--primary"
+            data-test="settings-close-button"
+            @click="closeSettingsPanel"
+          >
+            Done
+          </button>
         </div>
       </div>
+    </section>
 
-      <div class="totals-table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Team</th>
-              <th v-for="tab in HAND_TABS" :key="`head-${tab.id}`">{{ tab.label }}</th>
-              <th>Grand Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="team in TEAMS"
-              :key="`row-${team.id}`"
-              :class="{
-                'totals-row--leader': isLeader(team.id),
-                'totals-row--tie': hasAnyScores && !leaderTeamId,
-              }"
+    <section v-if="sessionChooserState === 'showing'" class="session-chooser">
+      <h2>Sessions</h2>
+      <p class="session-chooser-help">
+        Start a new game, continue your current session, or review an archived one.
+      </p>
+
+      <div class="session-chooser-actions">
+        <button
+          type="button"
+          class="chooser-button chooser-button--primary"
+          data-test="new-session-button"
+          @click="openNewSessionModal"
+        >
+          New Session
+        </button>
+
+        <div v-if="currentSessionOption" class="current-session-option">
+          <button
+            type="button"
+            class="chooser-button"
+            data-test="current-session-button"
+            @click="loadCurrentSession"
+          >
+            <span>Current Session</span>
+            <span class="current-session-timestamp"
+              >Started {{ formatSessionLabel(currentSessionOption) }}</span
             >
-              <th scope="row">{{ team.label }}</th>
-              <td v-for="tab in HAND_TABS" :key="`${team.id}-${tab.id}`">
-                {{ formatNumber(totalsByHand[tab.id][team.id].total) }}
-              </td>
-              <td
-                class="grand-total"
-                :class="{
-                  'grand-total--leader': isLeader(team.id),
-                  'grand-total--tie': hasAnyScores && !leaderTeamId,
-                }"
-              >
-                {{ formatNumber(totalsByTeam[team.id]) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          </button>
+        </div>
+
+        <div v-if="previousSessionOptions.length > 0" class="previous-session-picker">
+          <label for="previous-session-select">Archived Sessions</label>
+          <select
+            id="previous-session-select"
+            v-model="selectedPreviousSessionId"
+            data-test="previous-session-select"
+          >
+            <option value="">Select an archived session</option>
+            <option
+              v-for="session in previousSessionOptions"
+              :key="session.sessionId"
+              :value="session.sessionId"
+            >
+              {{ formatSessionLabel(session) }}
+            </option>
+          </select>
+          <button
+            type="button"
+            class="chooser-button"
+            data-test="open-previous-session-button"
+            :disabled="!selectedPreviousSessionId"
+            @click="loadPreviousSession"
+          >
+            Open
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="chooser-button chooser-button--danger"
+          data-test="delete-sessions-button"
+          @click="clearAllStoredSessions"
+        >
+          <span>Delete All Stored Sessions</span>
+          <span class="current-session-timestamp">
+            {{ allStoredSessions.length }} session{{ allStoredSessions.length === 1 ? '' : 's' }}
+            stored
+          </span>
+        </button>
       </div>
     </section>
+
+    <section
+      v-if="sessionTypeModalState === 'showing'"
+      class="session-modal-overlay"
+      data-test="session-type-modal"
+    >
+      <div
+        class="session-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="session-type-title"
+      >
+        <h3 id="session-type-title">How would you like to track this game?</h3>
+
+        <div class="session-type-options">
+          <label
+            v-for="option in SESSION_TYPE_OPTIONS"
+            :key="option.id"
+            class="session-type-option"
+          >
+            <input
+              v-model="selectedSessionType"
+              type="radio"
+              name="session-type"
+              :value="option.id"
+            />
+            <span>{{ option.label }}</span>
+          </label>
+        </div>
+
+        <div class="session-modal-actions">
+          <button
+            type="button"
+            class="chooser-button chooser-button--primary"
+            data-test="start-session-button"
+            @click="createNewSession"
+          >
+            Start Session
+          </button>
+          <button type="button" class="chooser-button" @click="closeNewSessionModal">Cancel</button>
+        </div>
+      </div>
+    </section>
+
+    <template v-if="sessionChooserState === 'hidden'">
+      <nav class="tab-row" aria-label="Canasta score tabs">
+        <div class="tab-group" aria-label="Hand tabs">
+          <p class="tab-group-title">Hands</p>
+          <div class="hand-pill-row">
+            <button
+              v-for="tab in HAND_TABS"
+              :key="tab.id"
+              type="button"
+              class="tab-pill tab-pill--hand"
+              :class="{ 'tab-pill--active': activeTab === tab.id }"
+              @click="setActiveTab(tab.id)"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="tab-pill tab-pill--totals"
+          :class="{ 'tab-pill--active': activeTab === TOTALS_TAB.id }"
+          @click="setActiveTab(TOTALS_TAB.id)"
+        >
+          {{ TOTALS_TAB.label }}
+        </button>
+      </nav>
+
+      <section v-if="activeHandTab" class="hand-tab-layout">
+        <CanastaHandForm
+          v-for="team in TEAMS"
+          :key="`${activeHandTab}-${team.id}`"
+          :team-id="team.id"
+          :team-label="team.label"
+          :session-type="currentSessionType"
+          :model-value="handState[activeHandTab][team.id]"
+          :totals="totalsByHand[activeHandTab][team.id]"
+          :went-out-disabled="isWentOutDisabled(activeHandTab, team.id)"
+          :is-read-only="isArchivedReadOnly"
+          :tooltips-enabled="tooltipsEnabled"
+          @update:model-value="updateTeamInputs(activeHandTab, team.id, $event)"
+          @save="persistHandState()"
+        />
+      </section>
+
+      <section v-else class="totals-tab" aria-label="Canasta team totals">
+        <div class="totals-tab-inner">
+          <h2>Totals</h2>
+          <p class="totals-help">Hand 1-4 totals and grand total per team.</p>
+
+          <div
+            class="leader-banner"
+            :class="{
+              'leader-banner--tie': hasAnyScores && !leaderTeamId,
+              'leader-banner--active': leaderTeamId,
+            }"
+          >
+            {{ leaderSummary }}
+          </div>
+        </div>
+
+        <div class="totals-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Team</th>
+                <th v-for="tab in HAND_TABS" :key="`head-${tab.id}`">{{ tab.label }}</th>
+                <th>Grand Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="team in TEAMS"
+                :key="`row-${team.id}`"
+                :class="{
+                  'totals-row--leader': isLeader(team.id),
+                  'totals-row--tie': hasAnyScores && !leaderTeamId,
+                }"
+              >
+                <th scope="row">{{ team.label }}</th>
+                <td v-for="tab in HAND_TABS" :key="`${team.id}-${tab.id}`">
+                  {{ formatNumber(totalsByHand[tab.id][team.id].total) }}
+                </td>
+                <td
+                  class="grand-total"
+                  :class="{
+                    'grand-total--leader': isLeader(team.id),
+                    'grand-total--tie': hasAnyScores && !leaderTeamId,
+                  }"
+                >
+                  {{ formatNumber(totalsByTeam[team.id]) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </template>
   </main>
 </template>
 
@@ -325,6 +732,13 @@ function formatNumber(value: number): string {
   box-shadow: 0 8px 32px rgba(26, 41, 52, 0.08);
 }
 
+.header-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -341,6 +755,236 @@ h1 {
 .intro {
   max-width: 65ch;
   color: var(--ui-muted);
+}
+
+.session-meta {
+  margin: 0.5rem 0 0;
+  color: var(--ui-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.readonly-badge {
+  margin: 0.5rem 0 0;
+  display: inline-block;
+  background: #f8f1da;
+  border: 1px solid #dccb8d;
+  color: #695118;
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.session-chooser {
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  padding: 1rem;
+  background: var(--ui-card);
+  display: grid;
+  gap: 0.8rem;
+}
+
+.session-chooser h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.session-chooser-help {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 0.88rem;
+}
+
+.session-chooser-actions {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.current-session-option {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.chooser-button .current-session-timestamp {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--ui-muted);
+  margin-top: 0.1rem;
+}
+
+.chooser-button {
+  min-height: 44px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-card);
+  color: var(--ui-text);
+  font-weight: 700;
+  padding: 0.45rem 0.7rem;
+}
+
+.chooser-button--primary {
+  background: linear-gradient(140deg, rgba(221, 239, 249, 0.95), rgba(240, 249, 255, 0.95));
+  border-color: #7eb4d4;
+}
+
+.chooser-button--danger {
+  background: linear-gradient(140deg, rgba(255, 244, 244, 0.95), rgba(255, 250, 250, 0.95));
+  border-color: #dfb5b5;
+  color: #7e2f2f;
+}
+
+.previous-session-picker {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.previous-session-picker label {
+  grid-column: 1 / -1;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ui-muted);
+}
+
+.previous-session-picker select {
+  min-height: 40px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  padding: 0 0.5rem;
+  background: #fff;
+}
+
+.session-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.session-modal {
+  width: min(100%, 32rem);
+  border-radius: 14px;
+  border: 1px solid var(--ui-border);
+  background: #fff;
+  padding: 1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.session-modal h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.session-type-options {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.session-type-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.session-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.back-to-chooser {
+  min-height: 40px;
+  min-width: 40px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ui-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back-to-chooser svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.back-to-chooser:focus-visible {
+  outline: 2px solid #7eb4d4;
+  outline-offset: 2px;
+}
+
+.session-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.settings-button {
+  min-height: 40px;
+  min-width: 40px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ui-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-button:focus-visible {
+  outline: 2px solid #7eb4d4;
+  outline-offset: 2px;
+}
+
+.settings-fields {
+  display: grid;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.settings-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 1rem;
+}
+
+.settings-field__label {
+  font-weight: 600;
+}
+
+.settings-field--toggle {
+  cursor: pointer;
+}
+
+.settings-field select {
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  font-size: 1rem;
+  background: #fff;
+}
+
+.settings-field input[type='checkbox'] {
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
 }
 
 .tab-row {

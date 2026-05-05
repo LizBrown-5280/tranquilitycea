@@ -1,7 +1,60 @@
 import { mount, type DOMWrapper } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { nextTick } from 'vue'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { loadAllSessions, saveSession } from '@/services/canasta/sessionStorage'
+import { createEmptyCanastaSessionEnvelope } from '@/types/canasta'
 import CanastaView from '@/views/CanastaView.vue'
+
+class LocalStorageMock {
+  private store: Record<string, string> = {}
+
+  getItem(key: string): string | null {
+    return this.store[key] ?? null
+  }
+
+  setItem(key: string, value: string): void {
+    this.store[key] = value
+  }
+
+  removeItem(key: string): void {
+    delete this.store[key]
+  }
+
+  clear(): void {
+    this.store = {}
+  }
+}
+
+async function startNewSession(wrapper: ReturnType<typeof mount>, sessionType = 'bothTeams') {
+  const newSessionButton = wrapper.find('[data-test="new-session-button"]')
+  if (!newSessionButton.exists()) {
+    throw new Error('Missing New Session button')
+  }
+
+  await newSessionButton.trigger('click')
+
+  if (sessionType !== 'bothTeams') {
+    const radio = wrapper.find(`input[type="radio"][value="${sessionType}"]`)
+    if (!radio.exists()) {
+      throw new Error(`Missing radio for session type: ${sessionType}`)
+    }
+    await radio.setValue(true)
+  }
+
+  const startSessionButton = wrapper.find('[data-test="start-session-button"]')
+  if (!startSessionButton.exists()) {
+    throw new Error('Missing Start Session button')
+  }
+
+  await startSessionButton.trigger('click')
+}
+
+async function mountWithNewSession(sessionType = 'bothTeams') {
+  const wrapper = mount(CanastaView)
+  await startNewSession(wrapper, sessionType)
+  return wrapper
+}
 
 function getTeamForm(wrapper: ReturnType<typeof mount>, teamLabel: string) {
   const form = wrapper
@@ -103,8 +156,91 @@ async function setRequirementInputValue(
 }
 
 describe('CanastaView', () => {
-  it('disables opposing team went-out checkbox when one team is checked', async () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', new LocalStorageMock())
+    vi.clearAllMocks()
+  })
+
+  it('shows the session chooser on initial load', () => {
     const wrapper = mount(CanastaView)
+
+    expect(wrapper.find('[data-test="new-session-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="start-session-button"]').exists()).toBe(false)
+  })
+
+  it('opens session type modal from new session button', async () => {
+    const wrapper = mount(CanastaView)
+    await wrapper.find('[data-test="new-session-button"]').trigger('click')
+
+    expect(wrapper.find('[data-test="session-type-modal"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="start-session-button"]').exists()).toBe(true)
+  })
+
+  it('shows current session button when a current session exists', async () => {
+    const now = Date.now()
+    const currentSession = createEmptyCanastaSessionEnvelope('bothTeams', now - 60 * 60 * 1000)
+    currentSession.handState.hand1.teamA.requirement7s = 1
+    saveSession(currentSession)
+
+    const wrapper = mount(CanastaView)
+    await nextTick()
+
+    expect(wrapper.find('[data-test="current-session-button"]').exists()).toBe(true)
+  })
+
+  it('shows previous sessions select when archived sessions exist', async () => {
+    const now = Date.now()
+    const archivedSession = createEmptyCanastaSessionEnvelope('bothTeams', now - 5 * 60 * 60 * 1000)
+    archivedSession.handState.hand1.teamA.requirement7s = 1
+    saveSession(archivedSession)
+
+    const wrapper = mount(CanastaView)
+    await nextTick()
+
+    expect(wrapper.find('[data-test="previous-session-select"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="open-previous-session-button"]').exists()).toBe(true)
+  })
+
+  it('loads archived session in read-only mode with disabled form inputs', async () => {
+    const now = Date.now()
+    const archivedSession = createEmptyCanastaSessionEnvelope('bothTeams', now - 5 * 60 * 60 * 1000)
+    archivedSession.handState.hand1.teamA.requirement7s = 3
+    saveSession(archivedSession)
+
+    const wrapper = mount(CanastaView)
+    await nextTick()
+    const select = wrapper.find('[data-test="previous-session-select"]')
+    await select.setValue(String(archivedSession.sessionId))
+    await wrapper.find('[data-test="open-previous-session-button"]').trigger('click')
+
+    expect(wrapper.text()).toContain('Archived Session (Read-Only)')
+
+    const disabledFieldset = wrapper.find('section.hand-form fieldset[disabled]')
+    expect(disabledFieldset.exists()).toBe(true)
+  })
+
+  it('renders myTeamOnly mode as full We form and manual Them form', async () => {
+    const wrapper = await mountWithNewSession('myTeamOnly')
+
+    const weForm = getTeamForm(wrapper, 'We')
+    const themForm = getTeamForm(wrapper, 'Them')
+
+    expect(weForm.find('[data-test="manual-big-count-input"]').exists()).toBe(false)
+    expect(themForm.find('[data-test="manual-big-count-input"]').exists()).toBe(true)
+  })
+
+  it('renders totalScoresOnly mode as manual forms for both teams', async () => {
+    const wrapper = await mountWithNewSession('totalScoresOnly')
+
+    const weForm = getTeamForm(wrapper, 'We')
+    const themForm = getTeamForm(wrapper, 'Them')
+
+    expect(weForm.find('[data-test="manual-big-count-input"]').exists()).toBe(true)
+    expect(themForm.find('[data-test="manual-big-count-input"]').exists()).toBe(true)
+  })
+
+  it('disables opposing team went-out checkbox when one team is checked', async () => {
+    const wrapper = await mountWithNewSession()
     const [teamACheckbox, teamBCheckbox] = getWentOutCheckboxes(wrapper)
 
     expect((teamACheckbox.element as HTMLInputElement).disabled).toBe(false)
@@ -117,7 +253,7 @@ describe('CanastaView', () => {
   })
 
   it('re-enables opposing team went-out checkbox when unchecked', async () => {
-    const wrapper = mount(CanastaView)
+    const wrapper = await mountWithNewSession()
     const [teamACheckbox, teamBCheckbox] = getWentOutCheckboxes(wrapper)
 
     await setCheckboxChecked(teamACheckbox, true)
@@ -128,7 +264,7 @@ describe('CanastaView', () => {
   })
 
   it('does not auto-check all requirements when went out is checked', async () => {
-    const wrapper = mount(CanastaView)
+    const wrapper = await mountWithNewSession()
     const [teamAWentOutCheckbox] = getWentOutCheckboxes(wrapper)
     const [teamAAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
 
@@ -140,7 +276,7 @@ describe('CanastaView', () => {
   })
 
   it('does not mutate requirement counts when went out is checked', async () => {
-    const wrapper = mount(CanastaView)
+    const wrapper = await mountWithNewSession()
 
     await setRequirementInputValue(wrapper, '7s', '2')
     await setRequirementInputValue(wrapper, '5s', '3')
@@ -154,7 +290,7 @@ describe('CanastaView', () => {
   })
 
   it('does not mutate requirement counts when all requirements is toggled', async () => {
-    const wrapper = mount(CanastaView)
+    const wrapper = await mountWithNewSession()
     const [teamAAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
 
     await setRequirementInputValue(wrapper, '7s', '4')
@@ -167,7 +303,7 @@ describe('CanastaView', () => {
   })
 
   it('keeps point labels out of the inline checkbox titles', async () => {
-    const wrapper = mount(CanastaView)
+    const wrapper = await mountWithNewSession()
     const teamAForm = getTeamForm(wrapper, 'We')
     const [teamAWentOutCheckbox] = getWentOutCheckboxes(wrapper)
     const [teamAAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
@@ -183,7 +319,7 @@ describe('CanastaView', () => {
   })
 
   it('adds all requirements bonus to big count while retaining manual requirement scoring', async () => {
-    const wrapper = mount(CanastaView)
+    const wrapper = await mountWithNewSession()
     const [teamAAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
 
     await setRequirementInputValue(wrapper, '7s', '1')
@@ -194,15 +330,15 @@ describe('CanastaView', () => {
     expect(getBigCountValue(wrapper)).toBe('16,300')
   })
 
-  it('renders the book counts heading without inline helper text', () => {
-    const wrapper = mount(CanastaView)
+  it('renders the book counts heading without inline helper text', async () => {
+    const wrapper = await mountWithNewSession()
 
     expect(wrapper.text()).toContain('Canasta Counts')
     expect(wrapper.text()).not.toContain('exclude requirement books if all requirements were met')
   })
 
   it('opens and closes the mobile-friendly info popup', async () => {
-    const wrapper = mount(CanastaView)
+    const wrapper = await mountWithNewSession()
     const teamAForm = getTeamForm(wrapper, 'We')
     const trigger = teamAForm.find('[data-tooltip-trigger="canastaCounts"]')
 
@@ -218,13 +354,161 @@ describe('CanastaView', () => {
     expect(wrapper.find('[data-tooltip-modal]').exists()).toBe(false)
   })
 
-  it('does not render clean and dirty inputs alongside red 3s box', () => {
-    const wrapper = mount(CanastaView)
+  describe('blur-only persistence', () => {
+    it('updates live score display immediately on input before blur', async () => {
+      const wrapper = await mountWithNewSession()
+
+      await setRequirementInputValue(wrapper, '7s', '2')
+
+      // Score should update reactively without needing blur
+      expect(getBigCountValue(wrapper, 'We')).toBe('10,000')
+    })
+
+    it('does not persist to localStorage until a field loses focus', async () => {
+      const wrapper = await mountWithNewSession()
+
+      // Directly manipulate the input value without triggering blur
+      const input = getRequirementInput(wrapper, '7s')
+      input.element.value = '3'
+      await input.trigger('input')
+
+      // Score shows updated value
+      expect(getBigCountValue(wrapper, 'We')).toBe('15,000')
+
+      // But localStorage session still has 0 for requirement7s
+      const sessions = loadAllSessions()
+      expect(sessions).toHaveLength(1)
+      expect(sessions[0]!.handState.hand1.teamA.requirement7s).toBe(0)
+    })
+
+    it('persists to localStorage after fieldset focusout', async () => {
+      const wrapper = await mountWithNewSession()
+
+      const input = getRequirementInput(wrapper, '7s')
+      input.element.value = '3'
+      await input.trigger('input')
+
+      // Trigger focusout on the fieldset (simulates blur from any child input)
+      const fieldset = getTeamForm(wrapper, 'We').find('fieldset')
+      await fieldset.trigger('focusout')
+
+      // Now localStorage should be updated
+      const sessions = loadAllSessions()
+      expect(sessions).toHaveLength(1)
+      expect(sessions[0]!.handState.hand1.teamA.requirement7s).toBe(3)
+    })
+  })
+
+  it('does not render clean and dirty inputs alongside red 3s box', async () => {
+    const wrapper = await mountWithNewSession()
     const teamAForm = getTeamForm(wrapper, 'We')
     const red3Box = teamAForm.findAll('.count-group-box').find((el) => el.text().includes('Red 3s'))
 
     expect(red3Box).toBeDefined()
     expect(red3Box!.text()).not.toContain('Clean')
     expect(red3Box!.text()).not.toContain('Dirty')
+  })
+
+  describe('settings panel', () => {
+    it('settings button is not visible before a session is started', async () => {
+      const wrapper = mount(CanastaView)
+      expect(wrapper.find('[data-test="settings-button"]').exists()).toBe(false)
+    })
+
+    describe('empty session pruning', () => {
+      it('removes empty sessions when returning to the session chooser', async () => {
+        const wrapper = await mountWithNewSession()
+
+        // Return to chooser without entering any scores
+        await wrapper.find('[data-test="back-to-chooser-button"]').trigger('click')
+
+        // The empty session should be pruned — no sessions in storage
+        expect(loadAllSessions()).toHaveLength(0)
+      })
+
+      it('keeps sessions that have at least one score entered', async () => {
+        const wrapper = await mountWithNewSession()
+
+        await setRequirementInputValue(wrapper, '7s', '1', 'We')
+        const fieldset = getTeamForm(wrapper, 'We').find('fieldset')
+        await fieldset.trigger('focusout')
+
+        await wrapper.find('[data-test="back-to-chooser-button"]').trigger('click')
+
+        expect(loadAllSessions()).toHaveLength(1)
+      })
+    })
+
+    it('opens and closes the settings panel', async () => {
+      const wrapper = await mountWithNewSession()
+
+      expect(wrapper.find('[data-test="settings-panel"]').exists()).toBe(false)
+
+      await wrapper.find('[data-test="settings-button"]').trigger('click')
+
+      expect(wrapper.find('[data-test="settings-panel"]').exists()).toBe(true)
+
+      await wrapper.find('[data-test="settings-close-button"]').trigger('click')
+
+      expect(wrapper.find('[data-test="settings-panel"]').exists()).toBe(false)
+    })
+
+    it('persists retention days to localStorage on change', async () => {
+      const wrapper = await mountWithNewSession()
+
+      await wrapper.find('[data-test="settings-button"]').trigger('click')
+      const select = wrapper.find('[data-test="settings-retention-select"]')
+      await select.setValue('30')
+
+      expect(localStorage.getItem('canasta:sessions:retentionDays')).toBe('30')
+    })
+
+    it('persists tooltip toggle to localStorage on change', async () => {
+      const wrapper = await mountWithNewSession()
+
+      await wrapper.find('[data-test="settings-button"]').trigger('click')
+      const toggle = wrapper.find('[data-test="settings-tooltips-toggle"]')
+      ;(toggle.element as HTMLInputElement).checked = false
+      await toggle.trigger('change')
+
+      expect(localStorage.getItem('canasta:settings:tooltipsEnabled')).toBe('false')
+    })
+
+    it('hides info buttons when tooltips are disabled', async () => {
+      const wrapper = await mountWithNewSession()
+
+      // Confirm info buttons exist by default
+      const teamAForm = getTeamForm(wrapper, 'We')
+      expect(teamAForm.find('[data-tooltip-trigger="canastaCounts"]').exists()).toBe(true)
+
+      // Disable tooltips via settings panel
+      await wrapper.find('[data-test="settings-button"]').trigger('click')
+      const toggle = wrapper.find('[data-test="settings-tooltips-toggle"]')
+      ;(toggle.element as HTMLInputElement).checked = false
+      await toggle.trigger('change')
+      await wrapper.find('[data-test="settings-close-button"]').trigger('click')
+
+      // Info buttons should now be hidden
+      expect(
+        getTeamForm(wrapper, 'We').find('[data-tooltip-trigger="canastaCounts"]').exists(),
+      ).toBe(false)
+    })
+
+    it('shows info buttons when tooltips are re-enabled', async () => {
+      const wrapper = await mountWithNewSession()
+
+      // Disable then re-enable tooltips
+      await wrapper.find('[data-test="settings-button"]').trigger('click')
+      const toggle = wrapper.find('[data-test="settings-tooltips-toggle"]')
+      ;(toggle.element as HTMLInputElement).checked = false
+      await toggle.trigger('change')
+      ;(toggle.element as HTMLInputElement).checked = true
+      await toggle.trigger('change')
+      await wrapper.find('[data-test="settings-close-button"]').trigger('click')
+
+      expect(
+        getTeamForm(wrapper, 'We').find('[data-tooltip-trigger="canastaCounts"]').exists(),
+      ).toBe(true)
+    })
   })
 })

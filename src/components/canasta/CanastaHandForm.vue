@@ -1,17 +1,30 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { canastaTooltipContent, type CanastaTooltipKey } from '@/content/canastaTooltips'
-import type { CanastaHandInputs, CanastaHandTotals } from '@/types/canasta'
+import type {
+  CanastaHandInputs,
+  CanastaHandTotals,
+  CanastaSessionType,
+  CanastaTeamId,
+} from '@/types/canasta'
 
 const props = defineProps<{
+  teamId: CanastaTeamId
   teamLabel: string
+  sessionType: CanastaSessionType
   modelValue: CanastaHandInputs
   totals: CanastaHandTotals
   wentOutDisabled: boolean
+  isReadOnly?: boolean
+  tooltipsEnabled?: boolean
 }>()
+
+const isReadOnly = computed(() => Boolean(props.isReadOnly))
+const tooltipsEnabled = computed(() => props.tooltipsEnabled !== false)
 
 const emit = defineEmits<{
   'update:modelValue': [value: CanastaHandInputs]
+  save: []
 }>()
 
 const tooltipLabels: Record<CanastaTooltipKey, string> = {
@@ -55,6 +68,25 @@ const fastCountTotal = computed(
 )
 const remainingCountTotal = computed(() => parseNonNegativeInteger(props.modelValue.cardCount))
 const cardsNotPlayedTotal = computed(() => parseNonNegativeInteger(props.modelValue.penaltyCount))
+const showManualTotalsOnly = computed(() => {
+  if (props.sessionType === 'totalScoresOnly') {
+    return true
+  }
+
+  if (props.sessionType === 'myTeamOnly' && props.teamId === 'teamB') {
+    return true
+  }
+
+  return false
+})
+const showFullScoringSections = computed(() => !showManualTotalsOnly.value)
+
+const manualTotal = computed(() => {
+  const big = props.modelValue.manualBigCount ?? 0
+  const card = props.modelValue.manualCardCount ?? 0
+  const penalty = props.modelValue.manualPenaltyCount ?? 0
+  return big + card - penalty
+})
 
 function parseNonNegativeInteger(rawValue: string | number | null | undefined): number {
   const parsed = Number(rawValue)
@@ -140,6 +172,19 @@ function onCardCountFocus(event: Event, field: 'cardCount' | 'penaltyCount') {
   }
 }
 
+function onManualTotalInput(
+  field: 'manualBigCount' | 'manualCardCount' | 'manualPenaltyCount',
+  rawValue: string,
+) {
+  const trimmedValue = rawValue.trim()
+  if (trimmedValue === '') {
+    updateField(field, null)
+    return
+  }
+
+  updateField(field, parseNonNegativeInteger(trimmedValue))
+}
+
 function openTooltip(key: CanastaTooltipKey) {
   activeTooltip.value = key
 }
@@ -153,407 +198,475 @@ function closeTooltip() {
   <section class="hand-form" :aria-label="`${teamLabel} scoring form`">
     <h3>{{ teamLabel }}</h3>
 
-    <div class="section-block">
-      <h4 class="title-with-info title-with-info--section">
-        <span>Big Count</span>
-        <button
-          type="button"
-          class="info-button"
-          aria-label="Show Big Count info"
-          data-tooltip-trigger="bigCount"
-          @click="openTooltip('bigCount')"
-        >
-          i
-        </button>
-      </h4>
+    <fieldset class="hand-form-fieldset" :disabled="isReadOnly" @focusout="emit('save')">
+      <template v-if="showFullScoringSections">
+        <div class="section-block">
+          <h4 class="title-with-info title-with-info--section">
+            <span>Big Count</span>
+            <button
+              v-if="tooltipsEnabled"
+              type="button"
+              class="info-button"
+              aria-label="Show Big Count info"
+              data-tooltip-trigger="bigCount"
+              @click="openTooltip('bigCount')"
+            >
+              i
+            </button>
+          </h4>
 
-      <div class="subsection-block">
-        <label class="requirements-toggle">
-          <input
-            :checked="modelValue.wentOut"
-            :disabled="wentOutDisabled"
-            type="checkbox"
-            @change="onToggleWentOut(($event.target as HTMLInputElement).checked)"
-          />
-          <span class="label-with-total">
-            <span class="title-with-info title-with-info--inline">
-              <span>Went Out First</span>
-              <button
-                type="button"
-                class="info-button"
-                aria-label="Show Went Out First info"
-                data-tooltip-trigger="wentOutFirst"
-                @click.stop.prevent="openTooltip('wentOutFirst')"
-              >
-                i
-              </button>
-            </span>
-            <strong class="label-total">({{ formatNumber(wentOutFirstTotal) }})</strong>
-          </span>
-        </label>
-        <label class="requirements-toggle">
-          <input
-            :checked="modelValue.allRequirements"
-            type="checkbox"
-            @change="onToggleAllRequirements(($event.target as HTMLInputElement).checked)"
-          />
-          <span class="label-with-total">
-            <span class="title-with-info title-with-info--inline">
-              <span>All Requirements Met</span>
-              <button
-                type="button"
-                class="info-button"
-                aria-label="Show All Requirements Met info"
-                data-tooltip-trigger="allRequirementsMet"
-                @click.stop.prevent="openTooltip('allRequirementsMet')"
-              >
-                i
-              </button>
-            </span>
-            <strong class="label-total">({{ formatNumber(allRequirementsMetTotal) }})</strong>
-          </span>
-        </label>
-
-        <div class="count-group-box">
-          <h5 class="book-counts-heading label-with-total">
-            <span class="title-with-info">
-              <span>Canasta Counts</span>
-              <button
-                type="button"
-                class="info-button"
-                aria-label="Show Canasta Counts info"
-                data-tooltip-trigger="canastaCounts"
-                @click="openTooltip('canastaCounts')"
-              >
-                i
-              </button>
-            </span>
-            <strong class="label-total">({{ formatNumber(canastaCountsTotal) }})</strong>
-          </h5>
-
-          <div class="requirements-grid requirements-grid--row1">
-            <label class="field">
-              <span>7s</span>
+          <div class="subsection-block">
+            <label class="requirements-toggle">
               <input
-                class="book-value-input"
-                :value="formatInputDisplay(modelValue.requirement7s)"
-                type="number"
-                inputmode="numeric"
-                min="0"
-                max="9"
-                @input="onNumberInput('requirement7s', ($event.target as HTMLInputElement).value)"
+                :checked="modelValue.wentOut"
+                :disabled="wentOutDisabled"
+                type="checkbox"
+                @change="onToggleWentOut(($event.target as HTMLInputElement).checked)"
               />
-            </label>
-            <label class="field">
-              <span>5s</span>
-              <input
-                class="book-value-input"
-                :value="formatInputDisplay(modelValue.requirement5s)"
-                type="number"
-                inputmode="numeric"
-                min="0"
-                max="9"
-                @input="onNumberInput('requirement5s', ($event.target as HTMLInputElement).value)"
-              />
-            </label>
-            <label class="field">
-              <span>Wilds</span>
-              <input
-                class="book-value-input"
-                :value="formatInputDisplay(modelValue.requirementWilds)"
-                type="number"
-                inputmode="numeric"
-                min="0"
-                max="9"
-                @input="
-                  onNumberInput('requirementWilds', ($event.target as HTMLInputElement).value)
-                "
-              />
-            </label>
-            <label class="field">
-              <span>Cleans</span>
-              <input
-                class="book-value-input"
-                :value="formatInputDisplay(modelValue.requirementCleans)"
-                type="number"
-                inputmode="numeric"
-                min="0"
-                max="9"
-                @input="
-                  onNumberInput('requirementCleans', ($event.target as HTMLInputElement).value)
-                "
-              />
-            </label>
-            <label class="field">
-              <span>Dirties</span>
-              <input
-                class="book-value-input"
-                :value="formatInputDisplay(modelValue.requirementDirtys)"
-                type="number"
-                inputmode="numeric"
-                min="0"
-                max="9"
-                @input="
-                  onNumberInput('requirementDirtys', ($event.target as HTMLInputElement).value)
-                "
-              />
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <div class="subsection-block">
-        <div class="count-group-box">
-          <h5 class="label-with-total">
-            <span class="title-with-info">
-              <span>Red 3s</span>
-              <button
-                type="button"
-                class="info-button"
-                aria-label="Show Red 3s info"
-                data-tooltip-trigger="redThrees"
-                @click="openTooltip('redThrees')"
-              >
-                i
-              </button>
-            </span>
-            <strong class="label-total">({{ formatNumber(redThreesTotal) }})</strong>
-          </h5>
-          <div class="face-value-row">
-            <label class="field">
-              <input
-                class="card-count-input"
-                :value="formatInputDisplay(modelValue.red3s)"
-                type="number"
-                inputmode="numeric"
-                min="0"
-                @input="onNumberInput('red3s', ($event.target as HTMLInputElement).value)"
-              />
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="section-block">
-      <h4 class="title-with-info title-with-info--section">
-        <span>Card Count</span>
-        <button
-          type="button"
-          class="info-button"
-          aria-label="Show Card Count info"
-          data-tooltip-trigger="cardCount"
-          @click="openTooltip('cardCount')"
-        >
-          i
-        </button>
-      </h4>
-      <div class="face-value-grid">
-        <div class="subsection-block subsection-block--fast-count">
-          <div class="count-group-box">
-            <h5 class="label-with-total">
-              <span class="title-with-info h5--red">
-                <span>Fast Count</span>
-                <button
-                  type="button"
-                  class="info-button info-button--red"
-                  aria-label="Show Fast Count info"
-                  data-tooltip-trigger="fastCount"
-                  @click="openTooltip('fastCount')"
-                >
-                  i
-                </button>
+              <span class="label-with-total">
+                <span class="title-with-info title-with-info--inline">
+                  <span>Went Out First</span>
+                  <button
+                    v-if="tooltipsEnabled"
+                    type="button"
+                    class="info-button"
+                    aria-label="Show Went Out First info"
+                    data-tooltip-trigger="wentOutFirst"
+                    @click.stop.prevent="openTooltip('wentOutFirst')"
+                  >
+                    i
+                  </button>
+                </span>
+                <strong class="label-total">({{ formatNumber(wentOutFirstTotal) }})</strong>
               </span>
-              <strong class="label-total">({{ formatNumber(fastCountTotal) }})</strong>
-            </h5>
-            <div class="face-value-row">
-              <label class="field">
-                <span>10pt</span>
-                <input
-                  class="book-value-input"
-                  :value="formatInputDisplay(modelValue.fastClean10Books)"
-                  type="number"
-                  inputmode="numeric"
-                  min="0"
-                  @input="
-                    onNumberInput('fastClean10Books', ($event.target as HTMLInputElement).value)
-                  "
-                />
-              </label>
-              <label class="field">
-                <span>5pt</span>
-                <input
-                  class="book-value-input"
-                  :value="formatInputDisplay(modelValue.fastClean5Books)"
-                  type="number"
-                  inputmode="numeric"
-                  min="0"
-                  @input="
-                    onNumberInput('fastClean5Books', ($event.target as HTMLInputElement).value)
-                  "
-                />
-              </label>
-              <label class="field">
-                <span>As</span>
-                <input
-                  class="book-value-input"
-                  :value="formatInputDisplay(modelValue.fastCleanABooks)"
-                  type="number"
-                  inputmode="numeric"
-                  min="0"
-                  @input="
-                    onNumberInput('fastCleanABooks', ($event.target as HTMLInputElement).value)
-                  "
-                />
-              </label>
+            </label>
+            <label class="requirements-toggle">
+              <input
+                :checked="modelValue.allRequirements"
+                type="checkbox"
+                @change="onToggleAllRequirements(($event.target as HTMLInputElement).checked)"
+              />
+              <span class="label-with-total">
+                <span class="title-with-info title-with-info--inline">
+                  <span>All Requirements Met</span>
+                  <button
+                    v-if="tooltipsEnabled"
+                    type="button"
+                    class="info-button"
+                    aria-label="Show All Requirements Met info"
+                    data-tooltip-trigger="allRequirementsMet"
+                    @click.stop.prevent="openTooltip('allRequirementsMet')"
+                  >
+                    i
+                  </button>
+                </span>
+                <strong class="label-total">({{ formatNumber(allRequirementsMetTotal) }})</strong>
+              </span>
+            </label>
+
+            <div class="count-group-box">
+              <h5 class="book-counts-heading label-with-total">
+                <span class="title-with-info">
+                  <span>Canasta Counts</span>
+                  <button
+                    v-if="tooltipsEnabled"
+                    type="button"
+                    class="info-button"
+                    aria-label="Show Canasta Counts info"
+                    data-tooltip-trigger="canastaCounts"
+                    @click="openTooltip('canastaCounts')"
+                  >
+                    i
+                  </button>
+                </span>
+                <strong class="label-total">({{ formatNumber(canastaCountsTotal) }})</strong>
+              </h5>
+
+              <div class="requirements-grid requirements-grid--row1">
+                <label class="field">
+                  <span>7s</span>
+                  <input
+                    class="book-value-input"
+                    :value="formatInputDisplay(modelValue.requirement7s)"
+                    type="number"
+                    inputmode="numeric"
+                    min="0"
+                    max="9"
+                    @input="
+                      onNumberInput('requirement7s', ($event.target as HTMLInputElement).value)
+                    "
+                  />
+                </label>
+                <label class="field">
+                  <span>5s</span>
+                  <input
+                    class="book-value-input"
+                    :value="formatInputDisplay(modelValue.requirement5s)"
+                    type="number"
+                    inputmode="numeric"
+                    min="0"
+                    max="9"
+                    @input="
+                      onNumberInput('requirement5s', ($event.target as HTMLInputElement).value)
+                    "
+                  />
+                </label>
+                <label class="field">
+                  <span>Wilds</span>
+                  <input
+                    class="book-value-input"
+                    :value="formatInputDisplay(modelValue.requirementWilds)"
+                    type="number"
+                    inputmode="numeric"
+                    min="0"
+                    max="9"
+                    @input="
+                      onNumberInput('requirementWilds', ($event.target as HTMLInputElement).value)
+                    "
+                  />
+                </label>
+                <label class="field">
+                  <span>Cleans</span>
+                  <input
+                    class="book-value-input"
+                    :value="formatInputDisplay(modelValue.requirementCleans)"
+                    type="number"
+                    inputmode="numeric"
+                    min="0"
+                    max="9"
+                    @input="
+                      onNumberInput('requirementCleans', ($event.target as HTMLInputElement).value)
+                    "
+                  />
+                </label>
+                <label class="field">
+                  <span>Dirties</span>
+                  <input
+                    class="book-value-input"
+                    :value="formatInputDisplay(modelValue.requirementDirtys)"
+                    type="number"
+                    inputmode="numeric"
+                    min="0"
+                    max="9"
+                    @input="
+                      onNumberInput('requirementDirtys', ($event.target as HTMLInputElement).value)
+                    "
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="subsection-block">
+            <div class="count-group-box">
+              <h5 class="label-with-total">
+                <span class="title-with-info">
+                  <span>Red 3s</span>
+                  <button
+                    v-if="tooltipsEnabled"
+                    type="button"
+                    class="info-button"
+                    aria-label="Show Red 3s info"
+                    data-tooltip-trigger="redThrees"
+                    @click="openTooltip('redThrees')"
+                  >
+                    i
+                  </button>
+                </span>
+                <strong class="label-total">({{ formatNumber(redThreesTotal) }})</strong>
+              </h5>
+              <div class="face-value-row">
+                <label class="field">
+                  <input
+                    class="card-count-input"
+                    :value="formatInputDisplay(modelValue.red3s)"
+                    type="number"
+                    inputmode="numeric"
+                    min="0"
+                    @input="onNumberInput('red3s', ($event.target as HTMLInputElement).value)"
+                  />
+                </label>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="subsection-block subsection-block--card-row">
-          <div class="count-group-box">
-            <h5 class="label-with-total">
-              <span class="title-with-info">
-                <span>Remaining Cards</span>
-                <button
-                  type="button"
-                  class="info-button"
-                  aria-label="Show Remaining Cards info"
-                  data-tooltip-trigger="remainingCount"
-                  @click="openTooltip('remainingCount')"
-                >
-                  i
-                </button>
-              </span>
-              <strong class="label-total">({{ formatNumber(remainingCountTotal) }})</strong>
-            </h5>
-            <div class="face-value-row">
-              <label class="field">
-                <input
-                  class="card-count-input"
-                  :value="cardCountDisplay"
-                  type="text"
-                  inputmode="numeric"
-                  min="0"
-                  @input="onCardCountInput($event, 'cardCount')"
-                  @blur="onCardCountBlur($event, 'cardCount')"
-                  @focus="onCardCountFocus($event, 'cardCount')"
-                />
-              </label>
+        <div class="section-block">
+          <h4 class="title-with-info title-with-info--section">
+            <span>Card Count</span>
+            <button
+              v-if="tooltipsEnabled"
+              type="button"
+              class="info-button"
+              aria-label="Show Card Count info"
+              data-tooltip-trigger="cardCount"
+              @click="openTooltip('cardCount')"
+            >
+              i
+            </button>
+          </h4>
+          <div class="face-value-grid">
+            <div class="subsection-block subsection-block--fast-count">
+              <div class="count-group-box">
+                <h5 class="label-with-total">
+                  <span class="title-with-info h5--red">
+                    <span>Fast Count</span>
+                    <button
+                      v-if="tooltipsEnabled"
+                      type="button"
+                      class="info-button info-button--red"
+                      aria-label="Show Fast Count info"
+                      data-tooltip-trigger="fastCount"
+                      @click="openTooltip('fastCount')"
+                    >
+                      i
+                    </button>
+                  </span>
+                  <strong class="label-total">({{ formatNumber(fastCountTotal) }})</strong>
+                </h5>
+                <div class="face-value-row">
+                  <label class="field">
+                    <span>10pt</span>
+                    <input
+                      class="book-value-input"
+                      :value="formatInputDisplay(modelValue.fastClean10Books)"
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      @input="
+                        onNumberInput('fastClean10Books', ($event.target as HTMLInputElement).value)
+                      "
+                    />
+                  </label>
+                  <label class="field">
+                    <span>5pt</span>
+                    <input
+                      class="book-value-input"
+                      :value="formatInputDisplay(modelValue.fastClean5Books)"
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      @input="
+                        onNumberInput('fastClean5Books', ($event.target as HTMLInputElement).value)
+                      "
+                    />
+                  </label>
+                  <label class="field">
+                    <span>As</span>
+                    <input
+                      class="book-value-input"
+                      :value="formatInputDisplay(modelValue.fastCleanABooks)"
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      @input="
+                        onNumberInput('fastCleanABooks', ($event.target as HTMLInputElement).value)
+                      "
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="subsection-block subsection-block--card-row">
+              <div class="count-group-box">
+                <h5 class="label-with-total">
+                  <span class="title-with-info">
+                    <span>Remaining Cards</span>
+                    <button
+                      v-if="tooltipsEnabled"
+                      type="button"
+                      class="info-button"
+                      aria-label="Show Remaining Cards info"
+                      data-tooltip-trigger="remainingCount"
+                      @click="openTooltip('remainingCount')"
+                    >
+                      i
+                    </button>
+                  </span>
+                  <strong class="label-total">({{ formatNumber(remainingCountTotal) }})</strong>
+                </h5>
+                <div class="face-value-row">
+                  <label class="field">
+                    <input
+                      class="card-count-input"
+                      :value="cardCountDisplay"
+                      type="text"
+                      inputmode="numeric"
+                      min="0"
+                      @input="onCardCountInput($event, 'cardCount')"
+                      @blur="onCardCountBlur($event, 'cardCount')"
+                      @focus="onCardCountFocus($event, 'cardCount')"
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <div class="section-block">
-      <h4 class="title-with-info title-with-info--section">
-        <span>Penalty Count</span>
-        <button
-          type="button"
-          class="info-button"
-          aria-label="Show Penalty Count info"
-          data-tooltip-trigger="penaltyCount"
-          @click="openTooltip('penaltyCount')"
+        <div class="section-block">
+          <h4 class="title-with-info title-with-info--section">
+            <span>Penalty Count</span>
+            <button
+              v-if="tooltipsEnabled"
+              type="button"
+              class="info-button"
+              aria-label="Show Penalty Count info"
+              data-tooltip-trigger="penaltyCount"
+              @click="openTooltip('penaltyCount')"
+            >
+              i
+            </button>
+          </h4>
+          <div class="subsection-block">
+            <div class="count-group-box">
+              <h5 class="label-with-total">
+                <span class="title-with-info">
+                  <span>Cards Not Played</span>
+                  <button
+                    v-if="tooltipsEnabled"
+                    type="button"
+                    class="info-button"
+                    aria-label="Show Cards Not Played info"
+                    data-tooltip-trigger="cardsNotPlayed"
+                    @click="openTooltip('cardsNotPlayed')"
+                  >
+                    i
+                  </button>
+                </span>
+                <strong class="label-total">({{ formatNumber(cardsNotPlayedTotal) }})</strong>
+              </h5>
+              <div class="face-value-row">
+                <label class="field">
+                  <input
+                    class="card-count-input"
+                    :value="penaltyCountDisplay"
+                    type="text"
+                    inputmode="numeric"
+                    min="0"
+                    @input="onCardCountInput($event, 'penaltyCount')"
+                    @blur="onCardCountBlur($event, 'penaltyCount')"
+                    @focus="onCardCountFocus($event, 'penaltyCount')"
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <div v-if="activeTooltip" class="tooltip-overlay" data-tooltip-modal @click="closeTooltip">
+        <div
+          class="tooltip-modal"
+          role="dialog"
+          aria-modal="true"
+          :aria-labelledby="`tooltip-title-${activeTooltip}`"
+          @click.stop
         >
-          i
-        </button>
-      </h4>
-      <div class="subsection-block">
-        <div class="count-group-box">
-          <h5 class="label-with-total">
-            <span class="title-with-info">
-              <span>Cards Not Played</span>
-              <button
-                type="button"
-                class="info-button"
-                aria-label="Show Cards Not Played info"
-                data-tooltip-trigger="cardsNotPlayed"
-                @click="openTooltip('cardsNotPlayed')"
-              >
-                i
-              </button>
-            </span>
-            <strong class="label-total">({{ formatNumber(cardsNotPlayedTotal) }})</strong>
-          </h5>
-          <div class="face-value-row">
-            <label class="field">
+          <div class="tooltip-modal__header">
+            <h5 :id="`tooltip-title-${activeTooltip}`">{{ tooltipLabels[activeTooltip] }}</h5>
+            <button
+              type="button"
+              class="tooltip-close"
+              aria-label="Close info popup"
+              @click="closeTooltip"
+            >
+              x
+            </button>
+          </div>
+          <p class="tooltip-copy">
+            {{ canastaTooltipContent[activeTooltip] || tooltipFallbackMessage }}
+          </p>
+        </div>
+      </div>
+
+      <div class="totals-block">
+        <h4>Totals</h4>
+        <div class="totals-grid">
+          <div class="total-row">
+            <span>Big Count</span>
+            <div class="total-value-group">
+              <span class="total-operator"></span>
               <input
-                class="card-count-input"
-                :value="penaltyCountDisplay"
+                v-if="showManualTotalsOnly"
+                class="total-value total-value--input"
+                :value="modelValue.manualBigCount ?? ''"
+                type="number"
+                inputmode="numeric"
+                min="0"
+                placeholder="0"
+                data-test="manual-big-count-input"
+                @input="
+                  onManualTotalInput('manualBigCount', ($event.target as HTMLInputElement).value)
+                "
+              />
+              <strong v-else class="total-value">{{ formatNumber(totals.bigCount) }}</strong>
+            </div>
+          </div>
+          <div class="total-row">
+            <span>Card Count</span>
+            <div class="total-value-group">
+              <span class="total-operator">+</span>
+              <input
+                v-if="showManualTotalsOnly"
+                class="total-value total-value--input"
+                :value="modelValue.manualCardCount ?? ''"
+                type="number"
+                inputmode="numeric"
+                min="0"
+                placeholder="0"
+                data-test="manual-card-count-input"
+                @input="
+                  onManualTotalInput('manualCardCount', ($event.target as HTMLInputElement).value)
+                "
+              />
+              <strong v-else class="total-value">{{
+                formatNumber(totals.fastCount + totals.cardCount)
+              }}</strong>
+            </div>
+          </div>
+          <div class="total-row">
+            <span>Penalty Count</span>
+            <div class="total-value-group">
+              <span class="total-operator">−</span>
+              <input
+                v-if="showManualTotalsOnly"
+                class="total-value total-value--input"
+                :value="modelValue.manualPenaltyCount ?? ''"
+                type="number"
+                inputmode="numeric"
+                min="0"
+                placeholder="0"
+                data-test="manual-penalty-count-input"
+                @input="
+                  onManualTotalInput(
+                    'manualPenaltyCount',
+                    ($event.target as HTMLInputElement).value,
+                  )
+                "
+              />
+              <strong v-else class="total-value">{{ formatNumber(totals.penaltyCount) }}</strong>
+            </div>
+          </div>
+          <div class="total-row total-row--emphasis">
+            <span>Total of All</span>
+            <div class="total-value-group">
+              <span class="total-operator">=</span>
+              <input
+                v-if="showManualTotalsOnly"
+                class="total-value total-value--input"
+                :value="formatNumber(manualTotal)"
                 type="text"
-                inputmode="numeric"
-                min="0"
-                @input="onCardCountInput($event, 'penaltyCount')"
-                @blur="onCardCountBlur($event, 'penaltyCount')"
-                @focus="onCardCountFocus($event, 'penaltyCount')"
+                disabled
+                data-test="manual-total-of-all-input"
               />
-            </label>
+              <strong v-else class="total-value">{{ formatNumber(totals.total) }}</strong>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-
-    <div v-if="activeTooltip" class="tooltip-overlay" data-tooltip-modal @click="closeTooltip">
-      <div
-        class="tooltip-modal"
-        role="dialog"
-        aria-modal="true"
-        :aria-labelledby="`tooltip-title-${activeTooltip}`"
-        @click.stop
-      >
-        <div class="tooltip-modal__header">
-          <h5 :id="`tooltip-title-${activeTooltip}`">{{ tooltipLabels[activeTooltip] }}</h5>
-          <button
-            type="button"
-            class="tooltip-close"
-            aria-label="Close info popup"
-            @click="closeTooltip"
-          >
-            x
-          </button>
-        </div>
-        <p class="tooltip-copy">
-          {{ canastaTooltipContent[activeTooltip] || tooltipFallbackMessage }}
-        </p>
-      </div>
-    </div>
-
-    <div class="totals-block">
-      <h4>Totals</h4>
-      <div class="totals-grid">
-        <div class="total-row">
-          <span>Big Count</span>
-          <div class="total-value-group">
-            <span class="total-operator"></span>
-            <strong class="total-value">{{ formatNumber(totals.bigCount) }}</strong>
-          </div>
-        </div>
-        <div class="total-row">
-          <span>Card Count</span>
-          <div class="total-value-group">
-            <span class="total-operator">+</span>
-            <strong class="total-value">{{
-              formatNumber(totals.fastCount + totals.cardCount)
-            }}</strong>
-          </div>
-        </div>
-        <div class="total-row">
-          <span>Penalty Count</span>
-          <div class="total-value-group">
-            <span class="total-operator">−</span>
-            <strong class="total-value">{{ formatNumber(totals.penaltyCount) }}</strong>
-          </div>
-        </div>
-        <div class="total-row total-row--emphasis">
-          <span>Total of All</span>
-          <div class="total-value-group">
-            <span class="total-operator">=</span>
-            <strong class="total-value">{{ formatNumber(totals.total) }}</strong>
-          </div>
-        </div>
-      </div>
-    </div>
+    </fieldset>
   </section>
 </template>
 
@@ -563,6 +676,15 @@ function closeTooltip() {
   border-radius: 14px;
   padding: 0.85rem;
   background: var(--ui-card);
+  display: grid;
+  gap: 0.9rem;
+}
+
+.hand-form-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
   display: grid;
   gap: 0.9rem;
 }
@@ -594,6 +716,42 @@ h5 {
 .totals-block {
   display: grid;
   gap: 0.6rem;
+}
+
+.total-value--input {
+  all: unset;
+  width: 100px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  padding: 0.36rem 0.5rem;
+  background: #f7fbff;
+  color: var(--ui-text);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: right;
+  box-sizing: border-box;
+  cursor: text;
+}
+
+.total-value--input:focus {
+  outline: 2px solid var(--ui-accent, #1f6f8b);
+  outline-offset: 1px;
+}
+
+/* Hide browser number input spinners */
+.total-value--input::-webkit-inner-spin-button,
+.total-value--input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.total-value--input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
 }
 
 .section-block > :not(h4),

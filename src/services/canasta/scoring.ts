@@ -10,6 +10,22 @@ function clampNonNegativeInteger(value: number | string | null | undefined): num
   return Math.max(0, Math.trunc(parsed))
 }
 
+function clampInteger(value: number | string | null | undefined): number {
+  const parsed = Number(value)
+
+  if (!Number.isFinite(parsed)) {
+    return 0
+  }
+
+  return Math.trunc(parsed)
+}
+
+function hasManualTotals(inputs: CanastaHandInputs): boolean {
+  return [inputs.manualBigCount, inputs.manualCardCount, inputs.manualPenaltyCount].some(
+    (value) => value !== null && value !== undefined,
+  )
+}
+
 function requirementsSubtotal(inputs: CanastaHandInputs): number {
   return (
     clampNonNegativeInteger(inputs.requirement7s) * 5000 +
@@ -45,6 +61,21 @@ function fastCountSubtotal(inputs: CanastaHandInputs): number {
 }
 
 export function scoreCanastaHand(inputs: CanastaHandInputs): CanastaHandTotals {
+  if (hasManualTotals(inputs)) {
+    const bigCount = clampNonNegativeInteger(inputs.manualBigCount)
+    const fastCount = 0
+    const cardCount = clampNonNegativeInteger(inputs.manualCardCount)
+    const penaltyCount = clampNonNegativeInteger(inputs.manualPenaltyCount)
+
+    return {
+      bigCount,
+      fastCount,
+      cardCount,
+      penaltyCount,
+      total: bigCount + cardCount - penaltyCount,
+    }
+  }
+
   const bigCount =
     requirementsSubtotal(inputs) + allRequirementsBonus(inputs) + secondRowSubtotal(inputs)
   const fastCount = fastCountSubtotal(inputs)
@@ -57,5 +88,17 @@ export function scoreCanastaHand(inputs: CanastaHandInputs): CanastaHandTotals {
     cardCount,
     penaltyCount,
     total: bigCount + fastCount + cardCount - penaltyCount,
+  }
+}
+
+export function createHandFromManualTotals(
+  bigCount: number,
+  cardCount: number,
+  penaltyCount: number,
+): Partial<CanastaHandInputs> {
+  return {
+    manualBigCount: clampNonNegativeInteger(bigCount),
+    manualCardCount: clampNonNegativeInteger(cardCount),
+    manualPenaltyCount: clampNonNegativeInteger(penaltyCount),
   }
 }

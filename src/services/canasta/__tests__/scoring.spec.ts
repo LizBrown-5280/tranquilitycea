@@ -44,4 +44,19 @@ describe('scoreCanastaHand', () => {
 
     expect(totals.bigCount).toBe(0)
   })
+
+  it('uses manual totals values when provided', () => {
+    const inputs = createEmptyCanastaHandInputs()
+    inputs.manualBigCount = 12500
+    inputs.manualCardCount = 380
+    inputs.manualPenaltyCount = 90
+
+    const totals = scoreCanastaHand(inputs)
+
+    expect(totals.bigCount).toBe(12500)
+    expect(totals.fastCount).toBe(0)
+    expect(totals.cardCount).toBe(380)
+    expect(totals.penaltyCount).toBe(90)
+    expect(totals.total).toBe(12790)
+  })
 })
