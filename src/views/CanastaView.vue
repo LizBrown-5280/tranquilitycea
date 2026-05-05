@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import confetti from 'canvas-confetti'
 
+import canastaLogoUrl from '@/assets/CanastaLogo.png'
 import CanastaHandForm from '@/components/canasta/CanastaHandForm.vue'
 import {
   getCurrentSession,
@@ -438,8 +439,15 @@ function clearAllStoredSessions() {
           </button>
         </div>
       </div>
-      <h1>Canasta</h1>
-      <p class="intro">Scoring has never been simpler!</p>
+      <div class="header-content">
+        <div class="header-logo">
+          <img :src="canastaLogoUrl" alt="Canasta Score Tracker" />
+        </div>
+        <div class="header-text">
+          <h1>Canasta</h1>
+          <p class="intro">Scoring has never been simpler!</p>
+        </div>
+      </div>
 
       <p v-if="activeSessionTypeLabel && sessionChooserState === 'hidden'" class="session-meta">
         Mode: {{ activeSessionTypeLabel }}
@@ -531,7 +539,7 @@ function clearAllStoredSessions() {
         </div>
 
         <div v-if="previousSessionOptions.length > 0" class="previous-session-picker">
-          <label for="previous-session-select">Archived Sessions</label>
+          <label for="previous-session-select">Archived Sessions ({{ retentionDays }} days)</label>
           <select
             id="previous-session-select"
             v-model="selectedPreviousSessionId"
@@ -730,6 +738,42 @@ function clearAllStoredSessions() {
   padding: 1rem;
   background: linear-gradient(140deg, rgba(240, 250, 240, 0.9), rgba(255, 255, 255, 0.9));
   box-shadow: 0 8px 32px rgba(26, 41, 52, 0.08);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.header-content {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.header-text {
+  flex: 1;
+}
+
+.header-logo {
+  flex-shrink: 0;
+  width: 100px;
+  height: 100px;
+}
+
+.header-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .header-top-row {

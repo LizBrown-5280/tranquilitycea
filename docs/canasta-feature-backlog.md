@@ -91,3 +91,32 @@ Copy and fill this format when adding an item:
 2. C-002 Session type modes
 3. C-003 User settings menu
 4. C-004 Dynamic tutorial step-throughs
+   const now = Date.now();
+   const makeSession = (offsetMs, label) => {
+   const ts = now - offsetMs;
+   const hands = {};
+   for (const h of ['hand1','hand2','hand3','hand4']) {
+   hands[h] = { teamA: {}, teamB: {} };
+   for (const t of ['teamA','teamB']) {
+   hands[h][t] = {
+   allRequirements:false,requirement7s:0,requirement5s:0,requirementWilds:0,
+   requirementCleans:0,requirementDirtys:0,red3s:0,wentOut:false,
+   fastClean10Books:0,fastClean5Books:0,fastCleanABooks:0,
+   cardCount:0,penaltyCount:0,manualBigCount:null,manualCardCount:null,manualPenaltyCount:null
+   };
+   }
+   }
+   return { sessionId: ts, createdAt: ts, updatedAt: ts, sessionType: 'myTeamOnly', activeTab: 'hand1', handState: hands, schemaVersion: 1 };
+   };
+
+const s1 = makeSession(6 _ 60 _ 60 _ 1000); // 6 hours ago
+const s2 = makeSession(2 _ 24 _ 60 _ 60 \* 1000); // 2 days ago
+
+localStorage.setItem(`canasta:session:${s1.sessionId}`, JSON.stringify(s1));
+localStorage.setItem(`canasta:session:${s2.sessionId}`, JSON.stringify(s2));
+
+const idx = JSON.parse(localStorage.getItem('canasta:sessions:index') || '[]');
+idx.push(s1.sessionId, s2.sessionId);
+localStorage.setItem('canasta:sessions:index', JSON.stringify(idx));
+
+console.log('Seeded 2 archived sessions — refresh the page.');
