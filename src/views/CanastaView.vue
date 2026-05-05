@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import confetti from 'canvas-confetti'
 
 import canastaLogoUrl from '@/assets/CanastaLogo.png'
@@ -98,18 +98,55 @@ const selectedPreviousSessionId = ref('')
 const isArchivedReadOnly = ref(false)
 const allStoredSessions = ref<CanastaSessionEnvelope[]>([])
 const activeSession = ref<CanastaSessionEnvelope | null>(null)
+const headerLogoRef = ref<HTMLElement | null>(null)
+const entryTransitionState = ref<'idle' | 'running'>('idle')
+const entryTransitionMetrics = ref({
+  startX: 0,
+  startY: 0,
+  startScale: 0.28,
+  endX: 0,
+  endY: -140,
+  endScale: 0.28,
+  targetSize: 320,
+})
+
+const ENTRY_TRANSITION_TOTAL_MS = 3000
+const NEW_SESSION_START_DELAY_MS = 80
+const entryTransitionTimerIds: number[] = []
 
 const handState =
   ref<Record<HandTabId, Record<CanastaTeamId, CanastaHandInputs>>>(createDefaultHandState())
 
 const currentSessionOption = computed(() => getCurrentSession(allStoredSessions.value))
 const previousSessionOptions = computed(() => getPreviousSessions(allStoredSessions.value))
+const isEntryTransitionRunning = computed(() => entryTransitionState.value === 'running')
+const shouldRenderChooserContent = computed(() => {
+  return sessionChooserState.value === 'showing' || isEntryTransitionRunning.value
+})
+const shouldRenderSessionContent = computed(() => {
+  return (
+    activeSession.value !== null &&
+    (sessionChooserState.value === 'hidden' || isEntryTransitionRunning.value)
+  )
+})
 const currentSessionType = computed<CanastaSessionType>(() => {
   return activeSession.value?.sessionType ?? 'bothTeams'
 })
 const activeSessionTypeLabel = computed(() => {
   const sessionType = activeSession.value?.sessionType
   return SESSION_TYPE_OPTIONS.find((option) => option.id === sessionType)?.label ?? ''
+})
+const logoOverlayStyle = computed(() => {
+  return {
+    '--entry-logo-start-x': `${entryTransitionMetrics.value.startX}px`,
+    '--entry-logo-start-y': `${entryTransitionMetrics.value.startY}px`,
+    '--entry-logo-start-scale': String(entryTransitionMetrics.value.startScale),
+    '--entry-logo-end-x': `${entryTransitionMetrics.value.endX}px`,
+    '--entry-logo-end-y': `${entryTransitionMetrics.value.endY}px`,
+    '--entry-logo-end-scale': String(entryTransitionMetrics.value.endScale),
+    '--entry-logo-target-size': `${entryTransitionMetrics.value.targetSize}px`,
+    '--entry-transition-duration': `${ENTRY_TRANSITION_TOTAL_MS}ms`,
+  }
 })
 
 function refreshStoredSessions() {
@@ -122,10 +159,110 @@ function hydrateFromSession(session: CanastaSessionEnvelope, readOnly = false) {
   handState.value = cloneHandState(session.handState)
   isArchivedReadOnly.value = readOnly
   confettiPlayed.value = false
+}
+
+function clearEntryTransitionTimers() {
+  while (entryTransitionTimerIds.length > 0) {
+    const timerId = entryTransitionTimerIds.pop()
+    if (timerId !== undefined) {
+      window.clearTimeout(timerId)
+    }
+  }
+}
+
+function queueEntryTransitionStep(callback: () => void, delayMs: number) {
+  const timerId = window.setTimeout(() => {
+    const timerIndex = entryTransitionTimerIds.indexOf(timerId)
+    if (timerIndex >= 0) {
+      entryTransitionTimerIds.splice(timerIndex, 1)
+    }
+    callback()
+  }, delayMs)
+
+  entryTransitionTimerIds.push(timerId)
+}
+
+function prefersReducedMotion() {
+  return (
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+}
+
+function measureEntryTransitionMetrics() {
+  if (typeof window === 'undefined') {
+    return {
+      startX: 0,
+      startY: -140,
+      startScale: 0.28,
+      endX: 0,
+      endY: -140,
+      endScale: 0.28,
+      targetSize: 320,
+    }
+  }
+
+  const viewportMin = Math.min(window.innerWidth, window.innerHeight)
+  const targetSize = Math.min(viewportMin * 0.92, 400)
+  const fallbackStartY = -Math.min(window.innerHeight * 0.24, 180)
+  const rect = headerLogoRef.value?.getBoundingClientRect()
+
+  if (!rect) {
+    return {
+      startX: 0,
+      startY: fallbackStartY,
+      startScale: 100 / targetSize,
+      endX: 0,
+      endY: fallbackStartY,
+      endScale: 100 / targetSize,
+      targetSize,
+    }
+  }
+
+  return {
+    startX: rect.left + rect.width / 2 - window.innerWidth / 2,
+    startY: rect.top + rect.height / 2 - window.innerHeight / 2,
+    startScale: Math.max(rect.width / targetSize, 0.18),
+    endX: rect.left + rect.width / 2 - window.innerWidth / 2,
+    endY: rect.top + rect.height / 2 - window.innerHeight / 2,
+    endScale: Math.max(rect.width / targetSize, 0.18),
+    targetSize,
+  }
+}
+
+function finishSessionEntryTransition() {
+  entryTransitionState.value = 'idle'
   sessionChooserState.value = 'hidden'
 }
 
+async function beginSessionEntryTransition(session: CanastaSessionEnvelope, readOnly = false) {
+  clearEntryTransitionTimers()
+  const startingMetrics = measureEntryTransitionMetrics()
+  hydrateFromSession(session, readOnly)
+  sessionChooserState.value = 'hidden'
+
+  if (prefersReducedMotion()) {
+    finishSessionEntryTransition()
+    return
+  }
+
+  await nextTick()
+  const endingMetrics = measureEntryTransitionMetrics()
+  entryTransitionMetrics.value = {
+    ...startingMetrics,
+    endX: endingMetrics.startX,
+    endY: endingMetrics.startY,
+    endScale: endingMetrics.startScale,
+    targetSize: endingMetrics.targetSize,
+  }
+  entryTransitionState.value = 'running'
+  queueEntryTransitionStep(() => {
+    finishSessionEntryTransition()
+  }, ENTRY_TRANSITION_TOTAL_MS)
+}
+
 function initializeSessionChooser() {
+  clearEntryTransitionTimers()
+  entryTransitionState.value = 'idle'
   pruneExpiredSessions()
   for (const session of loadAllSessions()) {
     if (isSessionEmpty(session)) {
@@ -143,6 +280,10 @@ onMounted(() => {
   initializeSessionChooser()
   retentionDays.value = getSessionRetentionDays()
   tooltipsEnabled.value = getTooltipsEnabled()
+})
+
+onBeforeUnmount(() => {
+  clearEntryTransitionTimers()
 })
 
 const activeHandTab = computed<HandTabId | null>(() => {
@@ -342,19 +483,31 @@ function createNewSession() {
   const newSession = createEmptyCanastaSessionEnvelope(selectedSessionType.value)
   saveSession(newSession)
   refreshStoredSessions()
-  hydrateFromSession(newSession)
   closeNewSessionModal()
-}
 
-function loadCurrentSession() {
-  if (!currentSessionOption.value) {
+  if (prefersReducedMotion()) {
+    beginSessionEntryTransition(newSession)
     return
   }
 
-  hydrateFromSession(currentSessionOption.value)
+  queueEntryTransitionStep(() => {
+    beginSessionEntryTransition(newSession)
+  }, NEW_SESSION_START_DELAY_MS)
+}
+
+function loadCurrentSession() {
+  if (!currentSessionOption.value || isEntryTransitionRunning.value) {
+    return
+  }
+
+  beginSessionEntryTransition(currentSessionOption.value)
 }
 
 function loadPreviousSession() {
+  if (isEntryTransitionRunning.value) {
+    return
+  }
+
   const sessionId = Number(selectedPreviousSessionId.value)
   if (!Number.isFinite(sessionId) || sessionId <= 0) {
     return
@@ -367,7 +520,7 @@ function loadPreviousSession() {
     return
   }
 
-  hydrateFromSession(selectedSession, true)
+  beginSessionEntryTransition(selectedSession, true)
 }
 
 function showSessionChooser() {
@@ -408,7 +561,10 @@ function clearAllStoredSessions() {
 </script>
 
 <template>
-  <main class="canasta-page">
+  <main
+    class="canasta-page"
+    :class="{ 'canasta-page--entry-transition': isEntryTransitionRunning }"
+  >
     <header class="canasta-header">
       <div class="header-top-row">
         <p class="eyebrow">Score Tracker</p>
@@ -440,7 +596,7 @@ function clearAllStoredSessions() {
         </div>
       </div>
       <div class="header-content">
-        <div class="header-logo">
+        <div ref="headerLogoRef" class="header-logo">
           <img :src="canastaLogoUrl" alt="Canasta Score Tracker" />
         </div>
         <div class="header-text">
@@ -508,78 +664,6 @@ function clearAllStoredSessions() {
       </div>
     </section>
 
-    <section v-if="sessionChooserState === 'showing'" class="session-chooser">
-      <h2>Sessions</h2>
-      <p class="session-chooser-help">
-        Start a new game, continue your current session, or review an archived one.
-      </p>
-
-      <div class="session-chooser-actions">
-        <button
-          type="button"
-          class="chooser-button chooser-button--primary"
-          data-test="new-session-button"
-          @click="openNewSessionModal"
-        >
-          New Session
-        </button>
-
-        <div v-if="currentSessionOption" class="current-session-option">
-          <button
-            type="button"
-            class="chooser-button"
-            data-test="current-session-button"
-            @click="loadCurrentSession"
-          >
-            <span>Current Session</span>
-            <span class="current-session-timestamp"
-              >Started {{ formatSessionLabel(currentSessionOption) }}</span
-            >
-          </button>
-        </div>
-
-        <div v-if="previousSessionOptions.length > 0" class="previous-session-picker">
-          <label for="previous-session-select">Archived Sessions ({{ retentionDays }} days)</label>
-          <select
-            id="previous-session-select"
-            v-model="selectedPreviousSessionId"
-            data-test="previous-session-select"
-          >
-            <option value="">Select an archived session</option>
-            <option
-              v-for="session in previousSessionOptions"
-              :key="session.sessionId"
-              :value="session.sessionId"
-            >
-              {{ formatSessionLabel(session) }}
-            </option>
-          </select>
-          <button
-            type="button"
-            class="chooser-button"
-            data-test="open-previous-session-button"
-            :disabled="!selectedPreviousSessionId"
-            @click="loadPreviousSession"
-          >
-            Open
-          </button>
-        </div>
-
-        <button
-          type="button"
-          class="chooser-button chooser-button--danger"
-          data-test="delete-sessions-button"
-          @click="clearAllStoredSessions"
-        >
-          <span>Delete All Stored Sessions</span>
-          <span class="current-session-timestamp">
-            {{ allStoredSessions.length }} session{{ allStoredSessions.length === 1 ? '' : 's' }}
-            stored
-          </span>
-        </button>
-      </div>
-    </section>
-
     <section
       v-if="sessionTypeModalState === 'showing'"
       class="session-modal-overlay"
@@ -623,104 +707,200 @@ function clearAllStoredSessions() {
       </div>
     </section>
 
-    <template v-if="sessionChooserState === 'hidden'">
-      <nav class="tab-row" aria-label="Canasta score tabs">
-        <div class="tab-group" aria-label="Hand tabs">
-          <p class="tab-group-title">Hands</p>
-          <div class="hand-pill-row">
+    <div
+      class="session-shell"
+      :class="{ 'session-shell--transitioning': isEntryTransitionRunning }"
+    >
+      <section
+        v-if="shouldRenderChooserContent"
+        class="session-chooser"
+        :aria-hidden="isEntryTransitionRunning"
+      >
+        <h2>Sessions</h2>
+        <p class="session-chooser-help">
+          Start a new game, continue your current session, or review an archived one.
+        </p>
+
+        <div class="session-chooser-actions">
+          <button
+            type="button"
+            class="chooser-button chooser-button--primary"
+            data-test="new-session-button"
+            @click="openNewSessionModal"
+          >
+            New Session
+          </button>
+
+          <div v-if="currentSessionOption" class="current-session-option">
             <button
-              v-for="tab in HAND_TABS"
-              :key="tab.id"
               type="button"
-              class="tab-pill tab-pill--hand"
-              :class="{ 'tab-pill--active': activeTab === tab.id }"
-              @click="setActiveTab(tab.id)"
+              class="chooser-button"
+              data-test="current-session-button"
+              @click="loadCurrentSession"
             >
-              {{ tab.label }}
+              <span>Current Session</span>
+              <span class="current-session-timestamp"
+                >Started {{ formatSessionLabel(currentSessionOption) }}</span
+              >
             </button>
           </div>
+
+          <div v-if="previousSessionOptions.length > 0" class="previous-session-picker">
+            <label for="previous-session-select"
+              >Archived Sessions ({{ retentionDays }} days)</label
+            >
+            <select
+              id="previous-session-select"
+              v-model="selectedPreviousSessionId"
+              data-test="previous-session-select"
+            >
+              <option value="">Select an archived session</option>
+              <option
+                v-for="session in previousSessionOptions"
+                :key="session.sessionId"
+                :value="session.sessionId"
+              >
+                {{ formatSessionLabel(session) }}
+              </option>
+            </select>
+            <button
+              type="button"
+              class="chooser-button"
+              data-test="open-previous-session-button"
+              :disabled="!selectedPreviousSessionId"
+              @click="loadPreviousSession"
+            >
+              Open
+            </button>
+          </div>
+
+          <button
+            type="button"
+            class="chooser-button chooser-button--danger"
+            data-test="delete-sessions-button"
+            @click="clearAllStoredSessions"
+          >
+            <span>Delete All Stored Sessions</span>
+            <span class="current-session-timestamp">
+              {{ allStoredSessions.length }} session{{ allStoredSessions.length === 1 ? '' : 's' }}
+              stored
+            </span>
+          </button>
         </div>
-
-        <button
-          type="button"
-          class="tab-pill tab-pill--totals"
-          :class="{ 'tab-pill--active': activeTab === TOTALS_TAB.id }"
-          @click="setActiveTab(TOTALS_TAB.id)"
-        >
-          {{ TOTALS_TAB.label }}
-        </button>
-      </nav>
-
-      <section v-if="activeHandTab" class="hand-tab-layout">
-        <CanastaHandForm
-          v-for="team in TEAMS"
-          :key="`${activeHandTab}-${team.id}`"
-          :team-id="team.id"
-          :team-label="team.label"
-          :session-type="currentSessionType"
-          :model-value="handState[activeHandTab][team.id]"
-          :totals="totalsByHand[activeHandTab][team.id]"
-          :went-out-disabled="isWentOutDisabled(activeHandTab, team.id)"
-          :is-read-only="isArchivedReadOnly"
-          :tooltips-enabled="tooltipsEnabled"
-          @update:model-value="updateTeamInputs(activeHandTab, team.id, $event)"
-          @save="persistHandState()"
-        />
       </section>
 
-      <section v-else class="totals-tab" aria-label="Canasta team totals">
-        <div class="totals-tab-inner">
-          <h2>Totals</h2>
-          <p class="totals-help">Hand 1-4 totals and grand total per team.</p>
-
-          <div
-            class="leader-banner"
-            :class="{
-              'leader-banner--tie': hasAnyScores && !leaderTeamId,
-              'leader-banner--active': leaderTeamId,
-            }"
-          >
-            {{ leaderSummary }}
-          </div>
-        </div>
-
-        <div class="totals-table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Team</th>
-                <th v-for="tab in HAND_TABS" :key="`head-${tab.id}`">{{ tab.label }}</th>
-                <th>Grand Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="team in TEAMS"
-                :key="`row-${team.id}`"
-                :class="{
-                  'totals-row--leader': isLeader(team.id),
-                  'totals-row--tie': hasAnyScores && !leaderTeamId,
-                }"
+      <div
+        v-if="shouldRenderSessionContent"
+        class="session-active-view"
+        :aria-hidden="sessionChooserState === 'showing' && !isEntryTransitionRunning"
+      >
+        <nav class="tab-row" aria-label="Canasta score tabs">
+          <div class="tab-group" aria-label="Hand tabs">
+            <p class="tab-group-title">Hands</p>
+            <div class="hand-pill-row">
+              <button
+                v-for="tab in HAND_TABS"
+                :key="tab.id"
+                type="button"
+                class="tab-pill tab-pill--hand"
+                :class="{ 'tab-pill--active': activeTab === tab.id }"
+                @click="setActiveTab(tab.id)"
               >
-                <th scope="row">{{ team.label }}</th>
-                <td v-for="tab in HAND_TABS" :key="`${team.id}-${tab.id}`">
-                  {{ formatNumber(totalsByHand[tab.id][team.id].total) }}
-                </td>
-                <td
-                  class="grand-total"
+                {{ tab.label }}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="tab-pill tab-pill--totals"
+            :class="{ 'tab-pill--active': activeTab === TOTALS_TAB.id }"
+            @click="setActiveTab(TOTALS_TAB.id)"
+          >
+            {{ TOTALS_TAB.label }}
+          </button>
+        </nav>
+
+        <section v-if="activeHandTab" class="hand-tab-layout">
+          <CanastaHandForm
+            v-for="team in TEAMS"
+            :key="`${activeHandTab}-${team.id}`"
+            :team-id="team.id"
+            :team-label="team.label"
+            :session-type="currentSessionType"
+            :model-value="handState[activeHandTab][team.id]"
+            :totals="totalsByHand[activeHandTab][team.id]"
+            :went-out-disabled="isWentOutDisabled(activeHandTab, team.id)"
+            :is-read-only="isArchivedReadOnly"
+            :tooltips-enabled="tooltipsEnabled"
+            @update:model-value="updateTeamInputs(activeHandTab, team.id, $event)"
+            @save="persistHandState()"
+          />
+        </section>
+
+        <section v-else class="totals-tab" aria-label="Canasta team totals">
+          <div class="totals-tab-inner">
+            <h2>Totals</h2>
+            <p class="totals-help">Hand 1-4 totals and grand total per team.</p>
+
+            <div
+              class="leader-banner"
+              :class="{
+                'leader-banner--tie': hasAnyScores && !leaderTeamId,
+                'leader-banner--active': leaderTeamId,
+              }"
+            >
+              {{ leaderSummary }}
+            </div>
+          </div>
+
+          <div class="totals-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Team</th>
+                  <th v-for="tab in HAND_TABS" :key="`head-${tab.id}`">{{ tab.label }}</th>
+                  <th>Grand Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="team in TEAMS"
+                  :key="`row-${team.id}`"
                   :class="{
-                    'grand-total--leader': isLeader(team.id),
-                    'grand-total--tie': hasAnyScores && !leaderTeamId,
+                    'totals-row--leader': isLeader(team.id),
+                    'totals-row--tie': hasAnyScores && !leaderTeamId,
                   }"
                 >
-                  {{ formatNumber(totalsByTeam[team.id]) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </template>
+                  <th scope="row">{{ team.label }}</th>
+                  <td v-for="tab in HAND_TABS" :key="`${team.id}-${tab.id}`">
+                    {{ formatNumber(totalsByHand[tab.id][team.id].total) }}
+                  </td>
+                  <td
+                    class="grand-total"
+                    :class="{
+                      'grand-total--leader': isLeader(team.id),
+                      'grand-total--tie': hasAnyScores && !leaderTeamId,
+                    }"
+                  >
+                    {{ formatNumber(totalsByTeam[team.id]) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div
+      v-if="isEntryTransitionRunning"
+      class="session-logo-overlay"
+      :style="logoOverlayStyle"
+      aria-hidden="true"
+    >
+      <img :src="canastaLogoUrl" alt="" />
+    </div>
   </main>
 </template>
 
@@ -738,6 +918,10 @@ function clearAllStoredSessions() {
   padding: 1rem;
   background: linear-gradient(140deg, rgba(240, 250, 240, 0.9), rgba(255, 255, 255, 0.9));
   box-shadow: 0 8px 32px rgba(26, 41, 52, 0.08);
+}
+
+.canasta-page--entry-transition {
+  pointer-events: none;
 }
 
 .sr-only {
@@ -774,6 +958,10 @@ function clearAllStoredSessions() {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.canasta-page--entry-transition .header-logo {
+  opacity: 0;
 }
 
 .header-top-row {
@@ -818,6 +1006,31 @@ h1 {
   padding: 0.2rem 0.6rem;
   font-size: 0.75rem;
   font-weight: 700;
+}
+
+.session-shell {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+}
+
+.session-active-view {
+  display: grid;
+  gap: 1rem;
+}
+
+.session-shell--transitioning > .session-chooser,
+.session-shell--transitioning > .session-active-view {
+  grid-area: 1 / 1;
+}
+
+.session-shell--transitioning > .session-chooser {
+  animation: sessionChooserFadeOut 850ms ease forwards;
+}
+
+.session-shell--transitioning > .session-active-view {
+  opacity: 0;
+  animation: sessionActiveFadeIn 1300ms ease 700ms forwards;
 }
 
 .session-chooser {
@@ -1031,6 +1244,26 @@ h1 {
   cursor: pointer;
 }
 
+.session-logo-overlay {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: var(--entry-logo-target-size);
+  height: var(--entry-logo-target-size);
+  z-index: 60;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: sessionLogoBurst var(--entry-transition-duration) cubic-bezier(0.22, 1, 0.36, 1)
+    forwards;
+}
+
+.session-logo-overlay img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 20px 28px rgba(15, 23, 42, 0.18));
+}
+
 .tab-row {
   display: flex;
   align-items: flex-end;
@@ -1201,6 +1434,67 @@ tbody th {
 .grand-total--tie {
   background: linear-gradient(135deg, #ddeff9, #eef6fb);
   color: #1f6f8b;
+}
+
+@keyframes sessionChooserFadeOut {
+  0% {
+    transform: scale(1);
+    filter: blur(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(0.985);
+    filter: blur(3px);
+  }
+
+  @keyframes sessionActiveFadeIn {
+    0% {
+      opacity: 0;
+      transform: translateY(1rem);
+    }
+
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sessionLogoBurst {
+  0% {
+    transform: translate(
+        calc(-50% + var(--entry-logo-start-x)),
+        calc(-50% + var(--entry-logo-start-y))
+      )
+      scale(var(--entry-logo-start-scale));
+  }
+
+  10% {
+    transform: translate(
+        calc(-50% + var(--entry-logo-start-x)),
+        calc(-50% + var(--entry-logo-start-y))
+      )
+      scale(var(--entry-logo-start-scale));
+  }
+
+  46% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  62% {
+    transform: translate(-50%, -50%) scale(1.07);
+  }
+
+  100% {
+    transform: translate(calc(-50% + var(--entry-logo-end-x)), calc(-50% + var(--entry-logo-end-y)))
+      scale(var(--entry-logo-end-scale));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-shell--transitioning > .session-chooser,
+  .session-shell--transitioning > .session-active-view,
+  .session-logo-overlay {
+    animation: none;
+  }
 }
 
 @media (min-width: 780px) {
