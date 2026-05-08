@@ -110,6 +110,18 @@ Copy and fill this format when adding an item:
   Clean and dirty books of the same rank compete for natural cards — combined per-rank book count capped at 4.
   Validation rules should be centralized constants, not scattered per-field.
 
+- `id`: C-006
+- `title`: Dark mode
+- `status`: idea
+- `summary`: Add a dark color scheme for the Canasta view that respects the user's OS preference and/or a manual toggle in the settings menu.
+- `user-value`: Reduces eye strain during evening play sessions; feels polished and modern.
+- `acceptance-criteria`:
+  - Dark mode activates automatically when the OS prefers dark (`prefers-color-scheme: dark`).
+  - A manual toggle in the settings menu overrides the OS preference and persists the choice.
+  - All Canasta UI surfaces (forms, tabs, totals table, modals, tooltips) are legible and styled in dark mode.
+  - No flash of un-themed content on load.
+- `notes`: Implement via CSS custom properties scoped to a `data-theme="dark"` attribute on the root element. Piggyback on the existing settings modal (C-003) for the toggle. Coordinate with any site-wide dark mode effort if one is planned.
+
 ## Prioritization Queue
 
 1. C-001 Session persistence
@@ -117,6 +129,7 @@ Copy and fill this format when adding an item:
 3. C-003 User settings menu
 4. C-004 Dynamic tutorial step-throughs
 5. C-005 Input validation — max books and max points per field
+6. C-006 Dark mode
    const now = Date.now();
    const makeSession = (offsetMs, label) => {
    const ts = now - offsetMs;
