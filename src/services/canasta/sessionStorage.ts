@@ -71,6 +71,13 @@ export function loadSession(sessionId: number): CanastaSessionEnvelope | null {
       return null
     }
 
+    // Reject sessions saved before the teamWe/teamThey rename (schema version 1 with old keys).
+    const handState = obj.handState as Record<string, Record<string, unknown>>
+    const firstHand = handState['hand1']
+    if (firstHand && ('teamA' in firstHand || 'teamB' in firstHand)) {
+      return null
+    }
+
     return parsed as CanastaSessionEnvelope
   } catch {
     return null
