@@ -483,8 +483,7 @@ function closeTooltip() {
           </div>
         </div>
       </template>
-
-      <div v-if="activeTooltip" class="tooltip-overlay" data-tooltip-modal @click="closeTooltip">
+      <div v-if="activeTooltip !== null" class="tooltip-overlay" data-tooltip-modal @click="closeTooltip">
         <div
           class="tooltip-modal"
           role="dialog"
@@ -508,7 +507,6 @@ function closeTooltip() {
           </p>
         </div>
       </div>
-
       <div class="totals-block">
         <h4>Totals</h4>
         <div class="totals-grid">
