@@ -24,6 +24,9 @@ import { RouterLink, RouterView } from 'vue-router'
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 nav {

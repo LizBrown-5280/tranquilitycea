@@ -17,6 +17,7 @@ const props = defineProps<{
   wentOutDisabled: boolean
   isReadOnly?: boolean
   tooltipsEnabled?: boolean
+  handLabel?: string
 }>()
 
 const isReadOnly = computed(() => Boolean(props.isReadOnly))
@@ -73,7 +74,7 @@ const showManualTotalsOnly = computed(() => {
     return true
   }
 
-  if (props.sessionType === 'myTeamOnly' && props.teamId === 'teamB') {
+  if (props.sessionType === 'myTeamOnly' && props.teamId === 'teamThey') {
     return true
   }
 
@@ -196,23 +197,20 @@ function closeTooltip() {
 
 <template>
   <section class="hand-form" :aria-label="`${teamLabel} scoring form`">
-    <h3>{{ teamLabel }}</h3>
+    <div class="hand-form-header">
+      <h3>{{ teamLabel }}</h3>
+      <span v-if="handLabel" class="hand-label">{{ handLabel }}</span>
+    </div>
 
     <fieldset class="hand-form-fieldset" :disabled="isReadOnly" @focusout="emit('save')">
       <template v-if="showFullScoringSections">
         <div class="section-block">
-          <h4 class="title-with-info title-with-info--section">
-            <span>Big Count</span>
-            <button
-              v-if="tooltipsEnabled"
-              type="button"
-              class="info-button"
-              aria-label="Show Big Count info"
-              data-tooltip-trigger="bigCount"
-              @click="openTooltip('bigCount')"
-            >
-              i
-            </button>
+          <h4
+            class="title-with-info--section"
+            :class="{ 'tooltip-title': tooltipsEnabled }"
+            @click="tooltipsEnabled && openTooltip('bigCount')"
+          >
+            Big Count
           </h4>
 
           <div class="subsection-block">
@@ -224,19 +222,11 @@ function closeTooltip() {
                 @change="onToggleWentOut(($event.target as HTMLInputElement).checked)"
               />
               <span class="label-with-total">
-                <span class="title-with-info title-with-info--inline">
-                  <span>Went Out First</span>
-                  <button
-                    v-if="tooltipsEnabled"
-                    type="button"
-                    class="info-button"
-                    aria-label="Show Went Out First info"
-                    data-tooltip-trigger="wentOutFirst"
-                    @click.stop.prevent="openTooltip('wentOutFirst')"
-                  >
-                    i
-                  </button>
-                </span>
+                <span
+                  :class="{ 'tooltip-title': tooltipsEnabled }"
+                  @click.stop.prevent="tooltipsEnabled && openTooltip('wentOutFirst')"
+                  >Went Out First</span
+                >
                 <strong class="label-total">({{ formatNumber(wentOutFirstTotal) }})</strong>
               </span>
             </label>
@@ -247,38 +237,22 @@ function closeTooltip() {
                 @change="onToggleAllRequirements(($event.target as HTMLInputElement).checked)"
               />
               <span class="label-with-total">
-                <span class="title-with-info title-with-info--inline">
-                  <span>All Requirements Met</span>
-                  <button
-                    v-if="tooltipsEnabled"
-                    type="button"
-                    class="info-button"
-                    aria-label="Show All Requirements Met info"
-                    data-tooltip-trigger="allRequirementsMet"
-                    @click.stop.prevent="openTooltip('allRequirementsMet')"
-                  >
-                    i
-                  </button>
-                </span>
+                <span
+                  :class="{ 'tooltip-title': tooltipsEnabled }"
+                  @click.stop.prevent="tooltipsEnabled && openTooltip('allRequirementsMet')"
+                  >All Requirements Met</span
+                >
                 <strong class="label-total">({{ formatNumber(allRequirementsMetTotal) }})</strong>
               </span>
             </label>
 
             <div class="count-group-box">
               <h5 class="book-counts-heading label-with-total">
-                <span class="title-with-info">
-                  <span>Canasta Counts</span>
-                  <button
-                    v-if="tooltipsEnabled"
-                    type="button"
-                    class="info-button"
-                    aria-label="Show Canasta Counts info"
-                    data-tooltip-trigger="canastaCounts"
-                    @click="openTooltip('canastaCounts')"
-                  >
-                    i
-                  </button>
-                </span>
+                <span
+                  :class="{ 'tooltip-title': tooltipsEnabled }"
+                  @click="tooltipsEnabled && openTooltip('canastaCounts')"
+                  >Canasta Counts</span
+                >
                 <strong class="label-total">({{ formatNumber(canastaCountsTotal) }})</strong>
               </h5>
 
@@ -291,7 +265,7 @@ function closeTooltip() {
                     type="number"
                     inputmode="numeric"
                     min="0"
-                    max="9"
+                    max="99"
                     @input="
                       onNumberInput('requirement7s', ($event.target as HTMLInputElement).value)
                     "
@@ -305,7 +279,7 @@ function closeTooltip() {
                     type="number"
                     inputmode="numeric"
                     min="0"
-                    max="9"
+                    max="99"
                     @input="
                       onNumberInput('requirement5s', ($event.target as HTMLInputElement).value)
                     "
@@ -319,7 +293,7 @@ function closeTooltip() {
                     type="number"
                     inputmode="numeric"
                     min="0"
-                    max="9"
+                    max="99"
                     @input="
                       onNumberInput('requirementWilds', ($event.target as HTMLInputElement).value)
                     "
@@ -333,7 +307,7 @@ function closeTooltip() {
                     type="number"
                     inputmode="numeric"
                     min="0"
-                    max="9"
+                    max="99"
                     @input="
                       onNumberInput('requirementCleans', ($event.target as HTMLInputElement).value)
                     "
@@ -347,7 +321,7 @@ function closeTooltip() {
                     type="number"
                     inputmode="numeric"
                     min="0"
-                    max="9"
+                    max="99"
                     @input="
                       onNumberInput('requirementDirtys', ($event.target as HTMLInputElement).value)
                     "
@@ -358,70 +332,48 @@ function closeTooltip() {
           </div>
 
           <div class="subsection-block">
-            <div class="count-group-box">
+            <div class="count-group-box count-group-box--inline">
               <h5 class="label-with-total">
-                <span class="title-with-info">
-                  <span>Red 3s</span>
-                  <button
-                    v-if="tooltipsEnabled"
-                    type="button"
-                    class="info-button"
-                    aria-label="Show Red 3s info"
-                    data-tooltip-trigger="redThrees"
-                    @click="openTooltip('redThrees')"
-                  >
-                    i
-                  </button>
-                </span>
+                <span
+                  :class="{ 'tooltip-title': tooltipsEnabled }"
+                  @click="tooltipsEnabled && openTooltip('redThrees')"
+                  >Red 3s</span
+                >
                 <strong class="label-total">({{ formatNumber(redThreesTotal) }})</strong>
               </h5>
-              <div class="face-value-row">
-                <label class="field">
-                  <input
-                    class="card-count-input"
-                    :value="formatInputDisplay(modelValue.red3s)"
-                    type="number"
-                    inputmode="numeric"
-                    min="0"
-                    @input="onNumberInput('red3s', ($event.target as HTMLInputElement).value)"
-                  />
-                </label>
-              </div>
+              <label class="field">
+                <input
+                  class="book-value-input"
+                  :value="formatInputDisplay(modelValue.red3s)"
+                  type="number"
+                  inputmode="numeric"
+                  min="0"
+                  max="99"
+                  @input="onNumberInput('red3s', ($event.target as HTMLInputElement).value)"
+                />
+              </label>
             </div>
           </div>
         </div>
 
         <div class="section-block">
-          <h4 class="title-with-info title-with-info--section">
-            <span>Card Count</span>
-            <button
-              v-if="tooltipsEnabled"
-              type="button"
-              class="info-button"
-              aria-label="Show Card Count info"
-              data-tooltip-trigger="cardCount"
-              @click="openTooltip('cardCount')"
-            >
-              i
-            </button>
+          <h4
+            class="title-with-info--section"
+            :class="{ 'tooltip-title': tooltipsEnabled }"
+            @click="tooltipsEnabled && openTooltip('cardCount')"
+          >
+            Card Count
           </h4>
           <div class="face-value-grid">
             <div class="subsection-block subsection-block--fast-count">
-              <div class="count-group-box">
+              <div class="count-group-box count-group-box--inline">
                 <h5 class="label-with-total">
-                  <span class="title-with-info h5--red">
-                    <span>Fast Count</span>
-                    <button
-                      v-if="tooltipsEnabled"
-                      type="button"
-                      class="info-button info-button--red"
-                      aria-label="Show Fast Count info"
-                      data-tooltip-trigger="fastCount"
-                      @click="openTooltip('fastCount')"
-                    >
-                      i
-                    </button>
-                  </span>
+                  <span
+                    class="h5--red"
+                    :class="{ 'tooltip-title': tooltipsEnabled }"
+                    @click="tooltipsEnabled && openTooltip('fastCount')"
+                    >Fast Count</span
+                  >
                   <strong class="label-total">({{ formatNumber(fastCountTotal) }})</strong>
                 </h5>
                 <div class="face-value-row">
@@ -469,88 +421,64 @@ function closeTooltip() {
             </div>
 
             <div class="subsection-block subsection-block--card-row">
-              <div class="count-group-box">
+              <div class="count-group-box count-group-box--inline">
                 <h5 class="label-with-total">
-                  <span class="title-with-info">
-                    <span>Remaining Cards</span>
-                    <button
-                      v-if="tooltipsEnabled"
-                      type="button"
-                      class="info-button"
-                      aria-label="Show Remaining Cards info"
-                      data-tooltip-trigger="remainingCount"
-                      @click="openTooltip('remainingCount')"
-                    >
-                      i
-                    </button>
-                  </span>
+                  <span
+                    :class="{ 'tooltip-title': tooltipsEnabled }"
+                    @click="tooltipsEnabled && openTooltip('remainingCount')"
+                    >Remaining Cards</span
+                  >
                   <strong class="label-total">({{ formatNumber(remainingCountTotal) }})</strong>
                 </h5>
-                <div class="face-value-row">
-                  <label class="field">
-                    <input
-                      class="card-count-input"
-                      :value="cardCountDisplay"
-                      type="text"
-                      inputmode="numeric"
-                      min="0"
-                      @input="onCardCountInput($event, 'cardCount')"
-                      @blur="onCardCountBlur($event, 'cardCount')"
-                      @focus="onCardCountFocus($event, 'cardCount')"
-                    />
-                  </label>
-                </div>
+                <label class="field">
+                  <input
+                    class="card-count-input"
+                    :value="cardCountDisplay"
+                    type="text"
+                    inputmode="numeric"
+                    min="0"
+                    maxlength="6"
+                    @input="onCardCountInput($event, 'cardCount')"
+                    @blur="onCardCountBlur($event, 'cardCount')"
+                    @focus="onCardCountFocus($event, 'cardCount')"
+                  />
+                </label>
               </div>
             </div>
           </div>
         </div>
 
         <div class="section-block">
-          <h4 class="title-with-info title-with-info--section">
-            <span>Penalty Count</span>
-            <button
-              v-if="tooltipsEnabled"
-              type="button"
-              class="info-button"
-              aria-label="Show Penalty Count info"
-              data-tooltip-trigger="penaltyCount"
-              @click="openTooltip('penaltyCount')"
-            >
-              i
-            </button>
+          <h4
+            class="title-with-info--section"
+            :class="{ 'tooltip-title': tooltipsEnabled }"
+            @click="tooltipsEnabled && openTooltip('penaltyCount')"
+          >
+            Penalty Count
           </h4>
           <div class="subsection-block">
-            <div class="count-group-box">
+            <div class="count-group-box count-group-box--inline">
               <h5 class="label-with-total">
-                <span class="title-with-info">
-                  <span>Cards Not Played</span>
-                  <button
-                    v-if="tooltipsEnabled"
-                    type="button"
-                    class="info-button"
-                    aria-label="Show Cards Not Played info"
-                    data-tooltip-trigger="cardsNotPlayed"
-                    @click="openTooltip('cardsNotPlayed')"
-                  >
-                    i
-                  </button>
-                </span>
+                <span
+                  :class="{ 'tooltip-title': tooltipsEnabled }"
+                  @click="tooltipsEnabled && openTooltip('cardsNotPlayed')"
+                  >Cards Not Played</span
+                >
                 <strong class="label-total">({{ formatNumber(cardsNotPlayedTotal) }})</strong>
               </h5>
-              <div class="face-value-row">
-                <label class="field">
-                  <input
-                    class="card-count-input"
-                    :value="penaltyCountDisplay"
-                    type="text"
-                    inputmode="numeric"
-                    min="0"
-                    @input="onCardCountInput($event, 'penaltyCount')"
-                    @blur="onCardCountBlur($event, 'penaltyCount')"
-                    @focus="onCardCountFocus($event, 'penaltyCount')"
-                  />
-                </label>
-              </div>
+              <label class="field">
+                <input
+                  class="card-count-input"
+                  :value="penaltyCountDisplay"
+                  type="text"
+                  inputmode="numeric"
+                  min="0"
+                  maxlength="6"
+                  @input="onCardCountInput($event, 'penaltyCount')"
+                  @blur="onCardCountBlur($event, 'penaltyCount')"
+                  @focus="onCardCountFocus($event, 'penaltyCount')"
+                />
+              </label>
             </div>
           </div>
         </div>
@@ -650,7 +578,7 @@ function closeTooltip() {
             </div>
           </div>
           <div class="total-row total-row--emphasis">
-            <span>Total of All</span>
+            <span>Grand Total</span>
             <div class="total-value-group">
               <span class="total-operator">=</span>
               <input
@@ -693,6 +621,22 @@ h3,
 h4,
 h5 {
   margin: 0;
+}
+
+.hand-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.hand-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ui-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 
 h3 {
@@ -765,57 +709,31 @@ h5 {
   color: var(--ui-muted);
 }
 
-.title-with-info {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  flex-wrap: wrap;
-}
-
 .title-with-info--section {
   justify-content: flex-start;
+}
+
+.tooltip-title {
+  cursor: pointer;
 }
 
 .label-with-total {
   width: 100%;
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.3rem;
 }
 
 .label-total {
-  margin-left: auto;
-  text-align: right;
   white-space: nowrap;
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: #94a3b8;
 }
 
 .h5--red {
   color: #c0392b;
-}
-
-.info-button {
-  width: 0.9rem;
-  height: 0.9rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--ui-border);
-  border-radius: 999px;
-  padding: 0;
-  align-self: flex-start;
-  background: #fff;
-  color: var(--ui-muted);
-  font-size: 0.45rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.info-button--red {
-  color: #c0392b;
-  border-color: #d9a39c;
 }
 
 .tooltip-overlay {
@@ -877,25 +795,13 @@ h5 {
 }
 
 .requirements-grid--row1 {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding-bottom: 0.2rem;
-}
-
-.requirements-grid--row2 {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding-bottom: 0.2rem;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.4rem;
 }
 
 .requirements-grid--row1 .field {
-  flex: 0 0 72px;
   min-width: 0;
-  overflow: hidden;
 }
 
 .requirements-grid--row1 .field span {
@@ -905,25 +811,11 @@ h5 {
   white-space: nowrap;
 }
 
-.requirements-grid--row2 .field {
-  flex: 0 0 130px;
-}
-
-.requirements-grid--row2 .field span {
-  white-space: nowrap;
-}
-
 .requirements-grid--row1 .field input {
   width: 100%;
-  min-height: 36px;
+  min-height: 32px;
   text-align: center;
-  padding: 0.3rem 0.35rem;
-}
-
-.requirements-grid--row2 .field input {
-  min-height: 36px;
-  text-align: center;
-  padding: 0.3rem 0.35rem;
+  padding: 0.2rem 0.1rem;
 }
 
 .requirements-toggle {
@@ -979,8 +871,8 @@ h5 {
   display: flex;
   flex-wrap: nowrap;
   gap: 0.5rem;
-  overflow-x: auto;
-  padding-bottom: 0.2rem;
+  overflow-x: visible;
+  padding-bottom: 0;
 }
 
 .count-group-box {
@@ -993,16 +885,45 @@ h5 {
   background: #f7fbff;
 }
 
+.count-group-box--inline {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+}
+
+.count-group-box--inline > h5 {
+  flex: 1;
+  min-width: 0;
+}
+
+.count-group-box--inline > .field {
+  flex: 0 0 56px;
+  width: 56px;
+}
+
+.count-group-box--inline > .field:has(.card-count-input) {
+  flex: 0 0 75px;
+  width: 75px;
+}
+
+.count-group-box--inline > .face-value-row,
+.count-group-box--inline .face-value-row {
+  flex-shrink: 0;
+}
+
 .count-group-box--wide {
   flex: 1;
 }
 
 .face-value-row .field {
-  flex: 0 0 75px;
+  flex: 1 1 0;
+  max-width: 56px;
 }
 
 .face-value-row .field input:not(.card-count-input) {
-  width: 75px;
+  width: 100%;
 }
 
 .field {
@@ -1018,22 +939,24 @@ h5 {
 }
 
 .field input {
-  width: 65px;
-  min-height: 40px;
+  width: 36px;
+  min-height: 32px;
   border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  padding: 0.48rem 0.6rem;
+  border-radius: 8px;
+  padding: 0.3rem 0.5rem;
   background: #fff;
   color: var(--ui-text);
 }
 
-.book-value-input {
+.field input.book-value-input {
+  width: 100%;
   text-align: center;
 }
 
 .card-count-input {
-  width: 90px !important;
+  width: 100% !important;
   text-align: right;
+  padding-right: 5px;
 }
 
 .field--checkbox {
@@ -1121,6 +1044,26 @@ h5 {
     max-height: 72vh;
     border-radius: 18px 18px 0 0;
     padding-bottom: 1.25rem;
+  }
+}
+
+@media (max-width: 410px) {
+  .subsection-block--fast-count .count-group-box--inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .subsection-block--fast-count .count-group-box--inline > h5 {
+    flex: none;
+  }
+
+  .subsection-block--fast-count .face-value-row {
+    width: 100%;
+  }
+
+  .subsection-block--fast-count .face-value-row .field {
+    flex: 1 1 0;
+    max-width: 56px;
   }
 }
 </style>

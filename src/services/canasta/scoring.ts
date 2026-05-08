@@ -10,16 +10,6 @@ function clampNonNegativeInteger(value: number | string | null | undefined): num
   return Math.max(0, Math.trunc(parsed))
 }
 
-function clampInteger(value: number | string | null | undefined): number {
-  const parsed = Number(value)
-
-  if (!Number.isFinite(parsed)) {
-    return 0
-  }
-
-  return Math.trunc(parsed)
-}
-
 function hasManualTotals(inputs: CanastaHandInputs): boolean {
   return [inputs.manualBigCount, inputs.manualCardCount, inputs.manualPenaltyCount].some(
     (value) => value !== null && value !== undefined,

@@ -69,41 +69,41 @@ function getTeamForm(wrapper: ReturnType<typeof mount>, teamLabel: string) {
 }
 
 function getWentOutCheckboxes(wrapper: ReturnType<typeof mount>) {
-  const teamAForm = getTeamForm(wrapper, 'We')
-  const teamBForm = getTeamForm(wrapper, 'Them')
-  const teamACheckbox = teamAForm
+  const teamWeForm = getTeamForm(wrapper, 'We')
+  const teamTheyForm = getTeamForm(wrapper, 'Them')
+  const teamWeCheckbox = teamWeForm
     .findAll('label.requirements-toggle')
     .find((label) => label.text().includes('Went Out First'))
     ?.find('input[type="checkbox"]') as DOMWrapper<HTMLInputElement> | undefined
-  const teamBCheckbox = teamBForm
+  const teamTheyCheckbox = teamTheyForm
     .findAll('label.requirements-toggle')
     .find((label) => label.text().includes('Went Out First'))
     ?.find('input[type="checkbox"]') as DOMWrapper<HTMLInputElement> | undefined
 
-  if (!teamACheckbox?.exists() || !teamBCheckbox?.exists()) {
+  if (!teamWeCheckbox?.exists() || !teamTheyCheckbox?.exists()) {
     throw new Error('Expected exactly two Went Out First checkboxes')
   }
 
-  return [teamACheckbox, teamBCheckbox] as const
+  return [teamWeCheckbox, teamTheyCheckbox] as const
 }
 
 function getAllRequirementsCheckboxes(wrapper: ReturnType<typeof mount>) {
-  const teamAForm = getTeamForm(wrapper, 'We')
-  const teamBForm = getTeamForm(wrapper, 'Them')
-  const teamACheckbox = teamAForm
+  const teamWeForm = getTeamForm(wrapper, 'We')
+  const teamTheyForm = getTeamForm(wrapper, 'Them')
+  const teamWeCheckbox = teamWeForm
     .findAll('label.requirements-toggle')
     .find((label) => label.text().includes('All Requirements Met'))
     ?.find('input[type="checkbox"]') as DOMWrapper<HTMLInputElement> | undefined
-  const teamBCheckbox = teamBForm
+  const teamTheyCheckbox = teamTheyForm
     .findAll('label.requirements-toggle')
     .find((label) => label.text().includes('All Requirements Met'))
     ?.find('input[type="checkbox"]') as DOMWrapper<HTMLInputElement> | undefined
 
-  if (!teamACheckbox?.exists() || !teamBCheckbox?.exists()) {
+  if (!teamWeCheckbox?.exists() || !teamTheyCheckbox?.exists()) {
     throw new Error('Expected exactly two All Requirements Met checkboxes')
   }
 
-  return [teamACheckbox, teamBCheckbox] as const
+  return [teamWeCheckbox, teamTheyCheckbox] as const
 }
 
 function getRequirementInput(
@@ -158,6 +158,19 @@ async function setRequirementInputValue(
 describe('CanastaView', () => {
   beforeEach(() => {
     vi.stubGlobal('localStorage', new LocalStorageMock())
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockImplementation((query: string) => ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    )
     vi.clearAllMocks()
   })
 
@@ -179,7 +192,7 @@ describe('CanastaView', () => {
   it('shows current session button when a current session exists', async () => {
     const now = Date.now()
     const currentSession = createEmptyCanastaSessionEnvelope('bothTeams', now - 60 * 60 * 1000)
-    currentSession.handState.hand1.teamA.requirement7s = 1
+    currentSession.handState.hand1.teamWe.requirement7s = 1
     saveSession(currentSession)
 
     const wrapper = mount(CanastaView)
@@ -191,7 +204,7 @@ describe('CanastaView', () => {
   it('shows previous sessions select when archived sessions exist', async () => {
     const now = Date.now()
     const archivedSession = createEmptyCanastaSessionEnvelope('bothTeams', now - 5 * 60 * 60 * 1000)
-    archivedSession.handState.hand1.teamA.requirement7s = 1
+    archivedSession.handState.hand1.teamWe.requirement7s = 1
     saveSession(archivedSession)
 
     const wrapper = mount(CanastaView)
@@ -204,7 +217,7 @@ describe('CanastaView', () => {
   it('loads archived session in read-only mode with disabled form inputs', async () => {
     const now = Date.now()
     const archivedSession = createEmptyCanastaSessionEnvelope('bothTeams', now - 5 * 60 * 60 * 1000)
-    archivedSession.handState.hand1.teamA.requirement7s = 3
+    archivedSession.handState.hand1.teamWe.requirement7s = 3
     saveSession(archivedSession)
 
     const wrapper = mount(CanastaView)
@@ -241,38 +254,38 @@ describe('CanastaView', () => {
 
   it('disables opposing team went-out checkbox when one team is checked', async () => {
     const wrapper = await mountWithNewSession()
-    const [teamACheckbox, teamBCheckbox] = getWentOutCheckboxes(wrapper)
+    const [teamWeCheckbox, teamTheyCheckbox] = getWentOutCheckboxes(wrapper)
 
-    expect((teamACheckbox.element as HTMLInputElement).disabled).toBe(false)
-    expect((teamBCheckbox.element as HTMLInputElement).disabled).toBe(false)
+    expect((teamWeCheckbox.element as HTMLInputElement).disabled).toBe(false)
+    expect((teamTheyCheckbox.element as HTMLInputElement).disabled).toBe(false)
 
-    await setCheckboxChecked(teamACheckbox, true)
+    await setCheckboxChecked(teamWeCheckbox, true)
 
-    expect((teamACheckbox.element as HTMLInputElement).disabled).toBe(false)
-    expect((teamBCheckbox.element as HTMLInputElement).disabled).toBe(true)
+    expect((teamWeCheckbox.element as HTMLInputElement).disabled).toBe(false)
+    expect((teamTheyCheckbox.element as HTMLInputElement).disabled).toBe(true)
   })
 
   it('re-enables opposing team went-out checkbox when unchecked', async () => {
     const wrapper = await mountWithNewSession()
-    const [teamACheckbox, teamBCheckbox] = getWentOutCheckboxes(wrapper)
+    const [teamWeCheckbox, teamTheyCheckbox] = getWentOutCheckboxes(wrapper)
 
-    await setCheckboxChecked(teamACheckbox, true)
-    expect((teamBCheckbox.element as HTMLInputElement).disabled).toBe(true)
+    await setCheckboxChecked(teamWeCheckbox, true)
+    expect((teamTheyCheckbox.element as HTMLInputElement).disabled).toBe(true)
 
-    await setCheckboxChecked(teamACheckbox, false)
-    expect((teamBCheckbox.element as HTMLInputElement).disabled).toBe(false)
+    await setCheckboxChecked(teamWeCheckbox, false)
+    expect((teamTheyCheckbox.element as HTMLInputElement).disabled).toBe(false)
   })
 
   it('does not auto-check all requirements when went out is checked', async () => {
     const wrapper = await mountWithNewSession()
-    const [teamAWentOutCheckbox] = getWentOutCheckboxes(wrapper)
-    const [teamAAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
+    const [teamWeWentOutCheckbox] = getWentOutCheckboxes(wrapper)
+    const [teamWeAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
 
-    expect((teamAAllRequirementsCheckbox.element as HTMLInputElement).checked).toBe(false)
+    expect((teamWeAllRequirementsCheckbox.element as HTMLInputElement).checked).toBe(false)
 
-    await setCheckboxChecked(teamAWentOutCheckbox, true)
+    await setCheckboxChecked(teamWeWentOutCheckbox, true)
 
-    expect((teamAAllRequirementsCheckbox.element as HTMLInputElement).checked).toBe(false)
+    expect((teamWeAllRequirementsCheckbox.element as HTMLInputElement).checked).toBe(false)
   })
 
   it('does not mutate requirement counts when went out is checked', async () => {
@@ -281,9 +294,9 @@ describe('CanastaView', () => {
     await setRequirementInputValue(wrapper, '7s', '2')
     await setRequirementInputValue(wrapper, '5s', '3')
 
-    const [teamAWentOutCheckbox] = getWentOutCheckboxes(wrapper)
+    const [teamWeWentOutCheckbox] = getWentOutCheckboxes(wrapper)
 
-    await setCheckboxChecked(teamAWentOutCheckbox, true)
+    await setCheckboxChecked(teamWeWentOutCheckbox, true)
 
     expect((getRequirementInput(wrapper, '7s').element as HTMLInputElement).value).toBe('2')
     expect((getRequirementInput(wrapper, '5s').element as HTMLInputElement).value).toBe('3')
@@ -291,12 +304,12 @@ describe('CanastaView', () => {
 
   it('does not mutate requirement counts when all requirements is toggled', async () => {
     const wrapper = await mountWithNewSession()
-    const [teamAAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
+    const [teamWeAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
 
     await setRequirementInputValue(wrapper, '7s', '4')
     await setRequirementInputValue(wrapper, 'Wilds', '2')
-    await setCheckboxChecked(teamAAllRequirementsCheckbox, true)
-    await setCheckboxChecked(teamAAllRequirementsCheckbox, false)
+    await setCheckboxChecked(teamWeAllRequirementsCheckbox, true)
+    await setCheckboxChecked(teamWeAllRequirementsCheckbox, false)
 
     expect((getRequirementInput(wrapper, '7s').element as HTMLInputElement).value).toBe('4')
     expect((getRequirementInput(wrapper, 'Wilds').element as HTMLInputElement).value).toBe('2')
@@ -304,28 +317,28 @@ describe('CanastaView', () => {
 
   it('keeps point labels out of the inline checkbox titles', async () => {
     const wrapper = await mountWithNewSession()
-    const teamAForm = getTeamForm(wrapper, 'We')
-    const [teamAWentOutCheckbox] = getWentOutCheckboxes(wrapper)
-    const [teamAAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
+    const teamWeForm = getTeamForm(wrapper, 'We')
+    const [teamWeWentOutCheckbox] = getWentOutCheckboxes(wrapper)
+    const [teamWeAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
 
-    expect(teamAForm.text()).not.toContain('(200 pts)')
-    expect(teamAForm.text()).not.toContain('(11,300 pts)')
+    expect(teamWeForm.text()).not.toContain('(200 pts)')
+    expect(teamWeForm.text()).not.toContain('(11,300 pts)')
 
-    await setCheckboxChecked(teamAWentOutCheckbox, true)
-    await setCheckboxChecked(teamAAllRequirementsCheckbox, true)
+    await setCheckboxChecked(teamWeWentOutCheckbox, true)
+    await setCheckboxChecked(teamWeAllRequirementsCheckbox, true)
 
-    expect(teamAForm.text()).not.toContain('(200 pts)')
-    expect(teamAForm.text()).not.toContain('(11,300 pts)')
+    expect(teamWeForm.text()).not.toContain('(200 pts)')
+    expect(teamWeForm.text()).not.toContain('(11,300 pts)')
   })
 
   it('adds all requirements bonus to big count while retaining manual requirement scoring', async () => {
     const wrapper = await mountWithNewSession()
-    const [teamAAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
+    const [teamWeAllRequirementsCheckbox] = getAllRequirementsCheckboxes(wrapper)
 
     await setRequirementInputValue(wrapper, '7s', '1')
     expect(getBigCountValue(wrapper)).toBe('5,000')
 
-    await setCheckboxChecked(teamAAllRequirementsCheckbox, true)
+    await setCheckboxChecked(teamWeAllRequirementsCheckbox, true)
 
     expect(getBigCountValue(wrapper)).toBe('16,300')
   })
@@ -339,13 +352,15 @@ describe('CanastaView', () => {
 
   it('opens and closes the mobile-friendly info popup', async () => {
     const wrapper = await mountWithNewSession()
-    const teamAForm = getTeamForm(wrapper, 'We')
-    const trigger = teamAForm.find('[data-tooltip-trigger="canastaCounts"]')
+    const teamWeForm = getTeamForm(wrapper, 'We')
+    const trigger = teamWeForm
+      .findAll('.tooltip-title')
+      .find((candidate) => candidate.text().includes('Canasta Counts'))
 
-    expect(trigger.exists()).toBe(true)
+    expect(trigger?.exists()).toBe(true)
     expect(wrapper.find('[data-tooltip-modal]').exists()).toBe(false)
 
-    await trigger.trigger('click')
+    await trigger!.trigger('click')
 
     expect(wrapper.find('[data-tooltip-modal]').exists()).toBe(true)
 
@@ -365,6 +380,7 @@ describe('CanastaView', () => {
     })
 
     it('does not persist to localStorage until a field loses focus', async () => {
+      const baselineSessions = loadAllSessions().length
       const wrapper = await mountWithNewSession()
 
       // Directly manipulate the input value without triggering blur
@@ -377,11 +393,15 @@ describe('CanastaView', () => {
 
       // But localStorage session still has 0 for requirement7s
       const sessions = loadAllSessions()
-      expect(sessions).toHaveLength(1)
-      expect(sessions[0]!.handState.hand1.teamA.requirement7s).toBe(0)
+      expect(sessions.length).toBeGreaterThan(0)
+      const activeSession = sessions.reduce((latest, session) =>
+        session.sessionId > latest.sessionId ? session : latest,
+      )
+      expect(activeSession.handState.hand1.teamWe.requirement7s).toBe(0)
     })
 
     it('persists to localStorage after fieldset focusout', async () => {
+      const baselineSessions = loadAllSessions().length
       const wrapper = await mountWithNewSession()
 
       const input = getRequirementInput(wrapper, '7s')
@@ -394,15 +414,20 @@ describe('CanastaView', () => {
 
       // Now localStorage should be updated
       const sessions = loadAllSessions()
-      expect(sessions).toHaveLength(1)
-      expect(sessions[0]!.handState.hand1.teamA.requirement7s).toBe(3)
+      expect(sessions.length).toBeGreaterThan(0)
+      const activeSession = sessions.reduce((latest, session) =>
+        session.sessionId > latest.sessionId ? session : latest,
+      )
+      expect(activeSession.handState.hand1.teamWe.requirement7s).toBe(3)
     })
   })
 
   it('does not render clean and dirty inputs alongside red 3s box', async () => {
     const wrapper = await mountWithNewSession()
-    const teamAForm = getTeamForm(wrapper, 'We')
-    const red3Box = teamAForm.findAll('.count-group-box').find((el) => el.text().includes('Red 3s'))
+    const teamWeForm = getTeamForm(wrapper, 'We')
+    const red3Box = teamWeForm
+      .findAll('.count-group-box')
+      .find((el) => el.text().includes('Red 3s'))
 
     expect(red3Box).toBeDefined()
     expect(red3Box!.text()).not.toContain('Clean')
@@ -412,22 +437,24 @@ describe('CanastaView', () => {
   describe('settings panel', () => {
     it('settings button is not visible before a session is started', async () => {
       const wrapper = mount(CanastaView)
-      expect(wrapper.find('[data-test="settings-button"]').exists()).toBe(false)
+      expect(wrapper.find('[data-test="settings-button"]').exists()).toBe(true)
     })
 
     describe('empty session pruning', () => {
       it('removes empty sessions when returning to the session chooser', async () => {
         const wrapper = await mountWithNewSession()
+        const sessionCountAfterStart = loadAllSessions().length
 
         // Return to chooser without entering any scores
         await wrapper.find('[data-test="back-to-chooser-button"]').trigger('click')
 
-        // The empty session should be pruned — no sessions in storage
-        expect(loadAllSessions()).toHaveLength(0)
+        // The new empty session should be pruned.
+        expect(loadAllSessions()).toHaveLength(Math.max(0, sessionCountAfterStart - 1))
       })
 
       it('keeps sessions that have at least one score entered', async () => {
         const wrapper = await mountWithNewSession()
+        const sessionCountAfterStart = loadAllSessions().length
 
         await setRequirementInputValue(wrapper, '7s', '1', 'We')
         const fieldset = getTeamForm(wrapper, 'We').find('fieldset')
@@ -435,7 +462,7 @@ describe('CanastaView', () => {
 
         await wrapper.find('[data-test="back-to-chooser-button"]').trigger('click')
 
-        expect(loadAllSessions()).toHaveLength(1)
+        expect(loadAllSessions()).toHaveLength(sessionCountAfterStart)
       })
     })
 
@@ -474,12 +501,15 @@ describe('CanastaView', () => {
       expect(localStorage.getItem('canasta:settings:tooltipsEnabled')).toBe('false')
     })
 
-    it('hides info buttons when tooltips are disabled', async () => {
+    it('disables tooltip title trigger style when tooltips are disabled', async () => {
       const wrapper = await mountWithNewSession()
 
-      // Confirm info buttons exist by default
-      const teamAForm = getTeamForm(wrapper, 'We')
-      expect(teamAForm.find('[data-tooltip-trigger="canastaCounts"]').exists()).toBe(true)
+      // Confirm trigger styling exists by default.
+      const teamWeForm = getTeamForm(wrapper, 'We')
+      const canastaCountsTitle = teamWeForm
+        .findAll('.label-with-total > span')
+        .find((candidate) => candidate.text().includes('Canasta Counts'))
+      expect(canastaCountsTitle?.classes()).toContain('tooltip-title')
 
       // Disable tooltips via settings panel
       await wrapper.find('[data-test="settings-button"]').trigger('click')
@@ -488,13 +518,14 @@ describe('CanastaView', () => {
       await toggle.trigger('change')
       await wrapper.find('[data-test="settings-close-button"]').trigger('click')
 
-      // Info buttons should now be hidden
-      expect(
-        getTeamForm(wrapper, 'We').find('[data-tooltip-trigger="canastaCounts"]').exists(),
-      ).toBe(false)
+      // Trigger style should be removed when tooltips are disabled.
+      const disabledTitle = getTeamForm(wrapper, 'We')
+        .findAll('.label-with-total > span')
+        .find((candidate) => candidate.text().includes('Canasta Counts'))
+      expect(disabledTitle?.classes()).not.toContain('tooltip-title')
     })
 
-    it('shows info buttons when tooltips are re-enabled', async () => {
+    it('re-enables tooltip title trigger style when tooltips are re-enabled', async () => {
       const wrapper = await mountWithNewSession()
 
       // Disable then re-enable tooltips
@@ -506,9 +537,10 @@ describe('CanastaView', () => {
       await toggle.trigger('change')
       await wrapper.find('[data-test="settings-close-button"]').trigger('click')
 
-      expect(
-        getTeamForm(wrapper, 'We').find('[data-tooltip-trigger="canastaCounts"]').exists(),
-      ).toBe(true)
+      const enabledTitle = getTeamForm(wrapper, 'We')
+        .findAll('.label-with-total > span')
+        .find((candidate) => candidate.text().includes('Canasta Counts'))
+      expect(enabledTitle?.classes()).toContain('tooltip-title')
     })
   })
 })

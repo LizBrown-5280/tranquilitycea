@@ -85,12 +85,38 @@ Copy and fill this format when adding an item:
   - Can be dismissed and reopened later.
 - `notes`: Consider mobile-first layout and tooltips reuse.
 
+- `id`: C-005
+- `title`: Input validation — max books and max points per field
+- `status`: idea
+- `summary`: Enforce realistic upper bounds on book counts and point totals based on the physical limits of a 6–7 deck game. Show inline error messages when entries exceed valid ranges.
+- `user-value`: Prevent data entry mistakes that would produce impossible or obviously wrong scores.
+- `acceptance-criteria`:
+  - Each book-count input (clean 10s, clean 5s, clean As, dirty) has a validated max derived from deck count (e.g., can't have more canastas than the cards in play allow).
+  - Point entry fields (card count, penalty, manual totals) have a sensible max tied to deck size.
+  - Inline validation messages appear near the offending field without blocking other inputs.
+  - Errors clear immediately on correction.
+  - Validation rules are centralized (not scattered per-field) and deck-count-aware if session settings expose that value.
+- `notes`: Deck count is fixed at 7. Book type breakdown and per-team validation ceilings (a team could theoretically capture all cards of a type through luck, so the full game ceiling is the correct per-team input guard):
+
+  | Field               | Book composition                                            | Cards in play                      | Max books (game total) | Per-team validation cap |
+  | ------------------- | ----------------------------------------------------------- | ---------------------------------- | ---------------------- | ----------------------- |
+  | `requirement7s`     | Clean, rank 7 only                                          | 4 suits × 7 decks = 28             | 28 ÷ 7 = **4**         | 4                       |
+  | `requirement5s`     | Clean, rank 5 only                                          | 4 suits × 7 decks = 28             | 28 ÷ 7 = **4**         | 4                       |
+  | `requirementWilds`  | 2s + jokers only                                            | (4+2) × 7 = 42                     | 42 ÷ 7 = **6**         | 6                       |
+  | `requirementCleans` | Natural cards, ranks 4/6/8/9/10/J/Q/K/A (9 ranks), no wilds | 28 per rank × 9 = 252              | 4/rank × 9 = **36**    | 36                      |
+  | `requirementDirtys` | ≥4 natural same-rank + ≤3 wilds                             | limited by wilds (42) and naturals | 42 (1 wild min each)   | 42                      |
+
+  Red 3 max per team: 14 (2 per deck × 7 decks; a team can hold all of them).
+  Clean and dirty books of the same rank compete for natural cards — combined per-rank book count capped at 4.
+  Validation rules should be centralized constants, not scattered per-field.
+
 ## Prioritization Queue
 
 1. C-001 Session persistence
 2. C-002 Session type modes
 3. C-003 User settings menu
 4. C-004 Dynamic tutorial step-throughs
+5. C-005 Input validation — max books and max points per field
    const now = Date.now();
    const makeSession = (offsetMs, label) => {
    const ts = now - offsetMs;

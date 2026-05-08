@@ -5,6 +5,11 @@
   --ui-muted: #51606f;
   --ui-border: #cad5df;
   --ui-accent: #1f6f8b;
+  --primary: var(--ui-accent);
+  --primary-light: #ddeef6;
+  --primary-dark: #17455a;
+  --text-secondary: var(--ui-muted);
+  --neutral-light: #eef3f7;
 }
 
 *,

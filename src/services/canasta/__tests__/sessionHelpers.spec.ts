@@ -219,7 +219,7 @@ describe('sessionHelpers', () => {
       const before = createSessionSnapshot(session)
 
       // Mutate a deeply nested field
-      session.handState.hand1.teamA.red3s = 5
+      session.handState.hand1.teamWe.red3s = 5
       const after = createSessionSnapshot(session)
 
       expect(hasSessionChanged(before, after)).toBe(true)

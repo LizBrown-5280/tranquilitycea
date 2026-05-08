@@ -1,4 +1,4 @@
-export type CanastaTeamId = 'teamA' | 'teamB'
+export type CanastaTeamId = 'teamWe' | 'teamThey'
 export type HandTabId = 'hand1' | 'hand2' | 'hand3' | 'hand4'
 export type CanastaTabId = HandTabId | 'totals'
 
@@ -80,7 +80,7 @@ export function createEmptyCanastaSessionEnvelope(
   now: number = Date.now(),
 ): CanastaSessionEnvelope {
   const HAND_TABS: HandTabId[] = ['hand1', 'hand2', 'hand3', 'hand4']
-  const TEAMS: CanastaTeamId[] = ['teamA', 'teamB']
+  const TEAMS: CanastaTeamId[] = ['teamWe', 'teamThey']
 
   const handState = {} as Record<HandTabId, Record<CanastaTeamId, CanastaHandInputs>>
   for (const handId of HAND_TABS) {

@@ -92,7 +92,7 @@ export function hasSessionChanged(before: string, after: string): boolean {
  */
 export function isSessionEmpty(session: CanastaSessionEnvelope): boolean {
   const HAND_TABS: HandTabId[] = ['hand1', 'hand2', 'hand3', 'hand4']
-  const TEAMS: CanastaTeamId[] = ['teamA', 'teamB']
+  const TEAMS: CanastaTeamId[] = ['teamWe', 'teamThey']
 
   for (const handId of HAND_TABS) {
     for (const teamId of TEAMS) {
