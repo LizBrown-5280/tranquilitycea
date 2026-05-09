@@ -1,5 +1,33 @@
 import type { Gw2EndpointDefinition } from '@/types/gw2'
 
+export type Gw2EndpointProfileKey = 'full' | 'wallet-only' | 'unlocks-finishers-gliders'
+
+const KNOWN_PROFILE_KEYS: Gw2EndpointProfileKey[] = [
+  'full',
+  'wallet-only',
+  'unlocks-finishers-gliders',
+]
+
+const ENDPOINT_PROFILE_ALLOWLIST: Record<
+  Gw2EndpointProfileKey,
+  { public: string[]; account: string[] }
+> = {
+  full: {
+    public: [],
+    account: [],
+  },
+  'wallet-only': {
+    public: ['currency_metadata'],
+    account: ['account_wallet'],
+  },
+  'unlocks-finishers-gliders': {
+    public: ['finisher_details', 'glider_details'],
+    account: ['account_finisher_unlocks', 'account_glider_unlocks'],
+  },
+}
+
+let hasWarnedInvalidProfile = false
+
 const PUBLIC_ENDPOINTS: Gw2EndpointDefinition[] = [
   {
     id: 'build_info',
@@ -849,6 +877,92 @@ const ACCOUNT_ENDPOINTS: Gw2EndpointDefinition[] = [
     requiredScopes: ['progression'],
   },
 ]
+
+function resolveEndpointsForProfile(
+  endpoints: Gw2EndpointDefinition[],
+  allowedEndpointIds: string[],
+): Gw2EndpointDefinition[] {
+  if (allowedEndpointIds.length === 0) {
+    return endpoints
+  }
+
+  const endpointById = new Map(endpoints.map((endpoint) => [endpoint.id, endpoint]))
+  const selectedIds = new Set<string>()
+
+  const includeWithDependencies = (endpointId: string) => {
+    if (selectedIds.has(endpointId)) {
+      return
+    }
+
+    const endpoint = endpointById.get(endpointId)
+    if (!endpoint) {
+      return
+    }
+
+    selectedIds.add(endpointId)
+
+    if ('dependsOn' in endpoint && typeof endpoint.dependsOn === 'string') {
+      includeWithDependencies(endpoint.dependsOn)
+    }
+  }
+
+  for (const endpointId of allowedEndpointIds) {
+    includeWithDependencies(endpointId)
+  }
+
+  return endpoints.filter((endpoint) => selectedIds.has(endpoint.id))
+}
+
+function toProfileKey(rawValue: string | undefined): Gw2EndpointProfileKey | undefined {
+  if (!rawValue) {
+    return undefined
+  }
+
+  return KNOWN_PROFILE_KEYS.find((profileKey) => profileKey === rawValue)
+}
+
+export function getActiveEndpointProfileKey(): Gw2EndpointProfileKey {
+  if (!import.meta.env.DEV) {
+    return 'full'
+  }
+
+  const configuredProfile = toProfileKey(import.meta.env.VITE_GW2_ENDPOINT_PROFILE)
+  if (configuredProfile) {
+    return configuredProfile
+  }
+
+  if (import.meta.env.VITE_GW2_ENDPOINT_PROFILE && !hasWarnedInvalidProfile) {
+    hasWarnedInvalidProfile = true
+    console.warn(
+      `[GW2 API] Unknown VITE_GW2_ENDPOINT_PROFILE="${import.meta.env.VITE_GW2_ENDPOINT_PROFILE}". Falling back to "full".`,
+    )
+  }
+
+  return 'full'
+}
+
+export function getPublicEndpointsForProfile(
+  profileKey: Gw2EndpointProfileKey,
+): Gw2EndpointDefinition[] {
+  return resolveEndpointsForProfile(PUBLIC_ENDPOINTS, ENDPOINT_PROFILE_ALLOWLIST[profileKey].public)
+}
+
+export function getAccountEndpointsForProfile(
+  profileKey: Gw2EndpointProfileKey,
+): Gw2EndpointDefinition[] {
+  return resolveEndpointsForProfile(
+    ACCOUNT_ENDPOINTS,
+    ENDPOINT_PROFILE_ALLOWLIST[profileKey].account,
+  )
+}
+
+export function getActivePublicEndpoints(): Gw2EndpointDefinition[] {
+  return getPublicEndpointsForProfile(getActiveEndpointProfileKey())
+}
+
+export function getActiveAccountEndpoints(): Gw2EndpointDefinition[] {
+  return getAccountEndpointsForProfile(getActiveEndpointProfileKey())
+}
 
 export const GW2_ENDPOINT_MANIFEST = {
   public: PUBLIC_ENDPOINTS,

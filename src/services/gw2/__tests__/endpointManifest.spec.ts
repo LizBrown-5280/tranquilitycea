@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { ACCOUNT_ENDPOINTS, PUBLIC_ENDPOINTS } from '@/services/gw2/endpointManifest'
+import {
+  ACCOUNT_ENDPOINTS,
+  PUBLIC_ENDPOINTS,
+  getAccountEndpointsForProfile,
+  getPublicEndpointsForProfile,
+} from '@/services/gw2/endpointManifest'
 import { GW2_API_KEY_SCOPES, GW2_SECTIONS } from '@/types/gw2'
 
 describe('GW2 endpoint manifest', () => {
@@ -225,5 +230,25 @@ describe('GW2 endpoint manifest', () => {
     expect(accountMaterials?.mode).toBe('single')
     expect(accountMaterials?.path).toBe('/v2/account/materials')
     expect(accountMaterials?.requiredScopes).toEqual(['inventories'])
+  })
+
+  it('filters wallet-only profile to wallet endpoints', () => {
+    const publicEndpoints = getPublicEndpointsForProfile('wallet-only')
+    const accountEndpoints = getAccountEndpointsForProfile('wallet-only')
+
+    expect(publicEndpoints.map((endpoint) => endpoint.id)).toEqual(['currency_metadata'])
+    expect(accountEndpoints.map((endpoint) => endpoint.id)).toEqual(['account_wallet'])
+  })
+
+  it('includes required dependencies for unlocks-finishers-gliders profile', () => {
+    const publicEndpoints = getPublicEndpointsForProfile('unlocks-finishers-gliders')
+    const accountEndpoints = getAccountEndpointsForProfile('unlocks-finishers-gliders')
+
+    expect(new Set(publicEndpoints.map((endpoint) => endpoint.id))).toEqual(
+      new Set(['finisher_ids', 'finisher_details', 'glider_ids', 'glider_details']),
+    )
+    expect(new Set(accountEndpoints.map((endpoint) => endpoint.id))).toEqual(
+      new Set(['account_finisher_unlocks', 'account_glider_unlocks']),
+    )
   })
 })

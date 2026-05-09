@@ -125,8 +125,30 @@ describe('section aggregators', () => {
     expect(aggregated.records).toContain('currency id order preview: 1, 2')
     expect(aggregated.records).toContain('wallet id order preview: 1, 5')
     expect(aggregated.records).toContain('currency catalog preview: Coin, Karma')
-    expect(aggregated.records).toContain('wallet display row: #1 Coin - 50')
-    expect(aggregated.records).toContain('wallet display row: #2 Karma - n/a')
+    expect(aggregated.records).toContain('wallet display row: Coin - 50')
+    expect(aggregated.records).toContain('wallet display row: Karma - 0')
+  })
+
+  it('shows balance pending key for wallet display rows when hasKey is false', () => {
+    const results: Gw2EndpointRunResult[] = [
+      {
+        endpointId: 'currency_metadata',
+        section: 'Wallet',
+        scope: 'public',
+        mode: 'csvIds',
+        ok: true,
+        requestCount: 1,
+        payload: [
+          { id: 1, name: 'Coin' },
+          { id: 2, name: 'Karma' },
+        ],
+      },
+    ]
+
+    const aggregated = aggregateWallet(results, false)
+
+    expect(aggregated.records).toContain('wallet display row: Coin - balance pending key')
+    expect(aggregated.records).toContain('wallet display row: Karma - balance pending key')
   })
 
   it('aggregates inventory metrics from item, character inventory, bank, and materials sources', () => {

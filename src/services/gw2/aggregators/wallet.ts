@@ -47,16 +47,18 @@ export function aggregateWallet(
     const label = currency.name ?? `Currency ${currency.id}`
     const value = walletValueByCurrencyId.has(currency.id)
       ? String(walletValueByCurrencyId.get(currency.id))
-      : 'n/a'
+      : hasKey
+        ? '0'
+        : 'balance pending key'
 
-    return `wallet display row: #${currency.id} ${label} - ${value}`
+    return `wallet display row: ${label} - ${value}`
   })
 
   const accountOnlyRows = knownCurrencies.length
     ? []
     : walletEntries
         .slice(0, 16)
-        .map((entry) => `wallet display row: #${entry.id} Currency ${entry.id} - ${entry.value}`)
+        .map((entry) => `wallet display row: Currency ${entry.id} - ${entry.value}`)
   const currencyNamePreview = knownCurrencies
     .map((currency) => currency.name)
     .filter((name): name is string => typeof name === 'string' && name.length > 0)

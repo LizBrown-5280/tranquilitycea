@@ -1,4 +1,7 @@
-import { ACCOUNT_ENDPOINTS, PUBLIC_ENDPOINTS } from '@/services/gw2/endpointManifest'
+import {
+  getActiveEndpointProfileKey,
+  type Gw2EndpointProfileKey,
+} from '@/services/gw2/endpointManifest'
 import { OPTIONAL_ON_404_ENDPOINT_IDS } from '@/services/gw2/endpointSupportPolicy'
 import { createGw2HttpClient } from '@/services/gw2/httpClient'
 import { parseEndpointPayload } from '@/services/gw2/endpointParsers'
@@ -13,6 +16,8 @@ import type {
 interface ExecuteBatchOptions {
   apiKey?: string
   payloadByEndpoint?: Record<string, unknown[]>
+  profileKey?: Gw2EndpointProfileKey
+  label?: string
 }
 
 const DEFAULT_CSV_PARAM = 'ids'
@@ -220,6 +225,7 @@ export async function executeEndpointBatch(
   endpoints: Gw2EndpointDefinition[],
   options: ExecuteBatchOptions = {},
 ): Promise<Gw2EndpointBatchResult> {
+  const startedAt = Date.now()
   const client = createGw2HttpClient()
   const payloadByEndpoint: Record<string, unknown[]> = {
     ...(options.payloadByEndpoint ?? {}),
@@ -242,22 +248,31 @@ export async function executeEndpointBatch(
     payloadByEndpoint[endpoint.id] = result.payload
   }
 
+  if (import.meta.env.DEV) {
+    const batchDurationMs = Date.now() - startedAt
+    const totalRequests = results.reduce((sum, result) => sum + result.requestCount, 0)
+    const failures = results.filter((result) => !result.ok)
+    const profileKey = options.profileKey ?? getActiveEndpointProfileKey()
+    const label = options.label ?? 'batch'
+
+    console.groupCollapsed(
+      `[GW2 API] ${label} | profile=${profileKey} | endpoints=${results.length} | requests=${totalRequests} | failures=${failures.length} | duration=${batchDurationMs}ms`,
+    )
+    console.table(
+      results.map((result) => ({
+        endpoint: result.endpointId,
+        section: result.section,
+        requests: result.requestCount,
+        ok: result.ok,
+        payloads: result.payload.length,
+        errorType: result.errorType ?? '',
+      })),
+    )
+    console.groupEnd()
+  }
+
   return {
     results,
     payloadByEndpoint,
   }
-}
-
-export async function executePublicEndpointBatch() {
-  return executeEndpointBatch(PUBLIC_ENDPOINTS)
-}
-
-export async function executeAccountEndpointBatch(
-  apiKey: string,
-  payloadByEndpoint: Record<string, unknown[]>,
-) {
-  return executeEndpointBatch(ACCOUNT_ENDPOINTS, {
-    apiKey,
-    payloadByEndpoint,
-  })
 }

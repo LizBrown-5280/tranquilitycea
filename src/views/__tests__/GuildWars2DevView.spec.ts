@@ -1,9 +1,10 @@
 import { computed, ref, shallowRef } from 'vue'
 import { setActivePinia, createPinia } from 'pinia'
+import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useGw2BootstrapStore } from '@/stores/gw2Bootstrap'
 import type { Gw2EndpointRunResult } from '@/types/gw2'
+import GuildWars2View from '@/views/GuildWars2DevView.vue'
 
 type AsyncStatus = 'idle' | 'loading'
 
@@ -65,7 +66,7 @@ vi.mock('@/services/gw2/endpointManifest', () => ({
   ],
 }))
 
-describe('useGw2BootstrapStore', () => {
+describe('GuildWars2View lifecycle', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
 
@@ -88,7 +89,7 @@ describe('useGw2BootstrapStore', () => {
     accountBatchQuery.refresh.mockClear()
   })
 
-  it('marks account-heavy sections as locked when no key is supplied', () => {
+  it('renders locked account sections after public-only load', async () => {
     progressionPublicQuery.data.value = [
       {
         endpointId: 'build_info',
@@ -101,16 +102,56 @@ describe('useGw2BootstrapStore', () => {
       },
     ]
 
-    const store = useGw2BootstrapStore()
+    const wrapper = mount(GuildWars2View)
 
-    expect(store.sections.Characters.state).toBe('locked/no-key')
-    expect(store.sections.Wallet.state).toBe('empty')
-    expect(store.sections.Progression.state).toBe('available')
-    expect(store.lifecycle).toBe('complete')
-    expect(store.activeSectionName).toBeUndefined()
+    expect(wrapper.text()).toContain('complete')
+    const arenaNetLink = wrapper.find('a[href="https://account.arena.net/applications"]')
+    expect(arenaNetLink.exists()).toBe(true)
+    expect(arenaNetLink.text()).toContain('Create or manage your key on ArenaNet')
+    expect(wrapper.text()).toContain('Locked (no key)')
+    expect(wrapper.text()).toContain('Available')
+    expect(wrapper.text()).toContain('Fractals, luck, mastery points, and achievement progress')
+    expect(accountBatchQuery.refresh).not.toHaveBeenCalled()
   })
 
-  it('emits partialError when account phase has endpoint failures', async () => {
+  it('runs account enrichment when key is supplied', async () => {
+    progressionPublicQuery.data.value = [
+      {
+        endpointId: 'build_info',
+        section: 'Progression',
+        scope: 'public',
+        mode: 'single',
+        ok: true,
+        requestCount: 1,
+        payload: [{ build_id: 1 }],
+      },
+    ]
+
+    accountBatchQuery.data.value = [
+      {
+        endpointId: 'account_wallet',
+        section: 'Wallet',
+        scope: 'account',
+        mode: 'single',
+        ok: true,
+        requestCount: 1,
+        payload: [[{ id: 1, value: 2000 }]],
+      },
+    ]
+
+    const wrapper = mount(GuildWars2View)
+    const keyInput = wrapper.find('#gw2-key')
+
+    await keyInput.setValue('temporary-key')
+    await wrapper.find('form').trigger('submit.prevent')
+
+    expect(accountBatchQuery.refresh).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('Wallet Entries')
+    expect(wrapper.text()).toContain('wallet entries tracked: 1')
+    expect(wrapper.text()).toContain('complete')
+  })
+
+  it('shows missing-scope guidance when account endpoint returns permission error', async () => {
     progressionPublicQuery.data.value = [
       {
         endpointId: 'build_info',
@@ -132,26 +173,69 @@ describe('useGw2BootstrapStore', () => {
         ok: false,
         requestCount: 1,
         payload: [],
-        error: '401 Unauthorized',
+        error: 'Request failed with status 403',
+        errorType: 'missingScope',
+        requiredScopes: ['wallet'],
+      },
+      {
+        endpointId: 'wallet_info_extra',
+        section: 'Wallet',
+        scope: 'account',
+        mode: 'single',
+        ok: false,
+        requestCount: 1,
+        payload: [],
+        error: 'Request failed with status 403',
+        errorType: 'missingScope',
+        requiredScopes: ['wallet', 'progression'],
+      },
+    ]
+
+    const wrapper = mount(GuildWars2View)
+    const keyInput = wrapper.find('#gw2-key')
+
+    await keyInput.setValue('scope-limited-key')
+    await wrapper.find('form').trigger('submit.prevent')
+
+    expect(wrapper.text()).toContain('blocked by API key permissions')
+    expect(wrapper.text()).toContain('grant scopes wallet')
+    expect(wrapper.text()).toContain('progression')
+  })
+
+  it('shows invalid-key warning when account endpoint returns invalidKey errors', async () => {
+    progressionPublicQuery.data.value = [
+      {
+        endpointId: 'build_info',
+        section: 'Progression',
+        scope: 'public',
+        mode: 'single',
+        ok: true,
+        requestCount: 1,
+        payload: [{ build_id: 1 }],
+      },
+    ]
+
+    accountBatchQuery.data.value = [
+      {
+        endpointId: 'wallet_info',
+        section: 'Wallet',
+        scope: 'account',
+        mode: 'single',
+        ok: false,
+        requestCount: 1,
+        payload: [],
+        error: 'Request failed with status 401',
         errorType: 'invalidKey',
         requiredScopes: ['wallet'],
       },
     ]
 
-    const store = useGw2BootstrapStore()
-    await store.setApiKey('secret-key')
+    const wrapper = mount(GuildWars2View)
+    const keyInput = wrapper.find('#gw2-key')
 
-    expect(accountBatchQuery.refresh).toHaveBeenCalledTimes(1)
-    expect(store.lifecycle).toBe('partialError')
-    expect(store.endpointErrors).toEqual([
-      {
-        endpoint: 'wallet_info',
-        message: '401 Unauthorized',
-        errorType: 'invalidKey',
-        requiredScopes: ['wallet'],
-      },
-    ])
-    expect(store.activeSectionName).toBeUndefined()
-    expect(store.sections.Wallet.state).toBe('partial')
+    await keyInput.setValue('expired-key')
+    await wrapper.find('form').trigger('submit.prevent')
+
+    expect(wrapper.text()).toContain('invalid or expired')
   })
 })
