@@ -27,7 +27,7 @@ describe('GW2 endpoint manifest', () => {
     ])
 
     expect(mappedModes).toEqual(
-      new Set(['single', 'csvIds', 'csvFrom', 'paged', 'byId', 'expandFrom']),
+      new Set(['single', 'csvIds', 'csvFrom', 'csvGraphFrom', 'paged', 'byId', 'expandFrom']),
     )
   })
 
@@ -109,6 +109,9 @@ describe('GW2 endpoint manifest', () => {
     const bankItemDetails = ACCOUNT_ENDPOINTS.find(
       (endpoint) => endpoint.id === 'bank_item_details',
     )
+    const bankRelatedItemDetails = ACCOUNT_ENDPOINTS.find(
+      (endpoint) => endpoint.id === 'bank_related_item_details',
+    )
 
     expect(bankItemDetails?.mode).toBe('csvFrom')
 
@@ -119,6 +122,18 @@ describe('GW2 endpoint manifest', () => {
     expect(bankItemDetails.dependsOn).toBe('account_bank')
     expect(bankItemDetails.csvParam).toBe('ids')
     expect(bankItemDetails.extractIds([[{ id: 1 }, null, { id: 2 }, { id: 1 }]])).toEqual([1, 2])
+
+    expect(bankRelatedItemDetails?.mode).toBe('csvGraphFrom')
+    if (bankRelatedItemDetails?.mode === 'csvGraphFrom') {
+      expect(bankRelatedItemDetails.dependsOn).toBe('bank_item_details')
+      const relationIds = bankRelatedItemDetails.extractIds([
+        [
+          { id: 1, upgrades_into: [101, 102] },
+          { id: 2, upgrades_from: [98] },
+        ],
+      ])
+      expect(new Set(relationIds)).toEqual(new Set([101, 102, 98]))
+    }
   })
 
   it('maps account unlock families to Account Unlocks section', () => {
@@ -135,6 +150,8 @@ describe('GW2 endpoint manifest', () => {
         'mail_carrier_details',
         'finisher_ids',
         'finisher_details',
+        'finisher_unlock_item_details',
+        'finisher_unlock_related_item_details',
         'glider_ids',
         'glider_details',
         'novelty_ids',
@@ -180,7 +197,7 @@ describe('GW2 endpoint manifest', () => {
       ].includes(endpoint.id),
     )
 
-    expect(publicUnlockEndpoints.length).toBe(32)
+    expect(publicUnlockEndpoints.length).toBe(34)
     expect(accountUnlockEndpoints.length).toBe(16)
 
     for (const endpoint of publicUnlockEndpoints) {
@@ -202,6 +219,9 @@ describe('GW2 endpoint manifest', () => {
     )
     const accountMaterials = ACCOUNT_ENDPOINTS.find(
       (endpoint) => endpoint.id === 'account_materials',
+    )
+    const materialsRelatedDetails = PUBLIC_ENDPOINTS.find(
+      (endpoint) => endpoint.id === 'materials_related_item_details',
     )
 
     // Materials categories depend on material IDs
@@ -226,6 +246,18 @@ describe('GW2 endpoint manifest', () => {
       expect(new Set(itemIds)).toEqual(new Set([12134, 12135, 24876, 24877]))
     }
 
+    expect(materialsRelatedDetails?.mode).toBe('csvGraphFrom')
+    if (materialsRelatedDetails?.mode === 'csvGraphFrom') {
+      expect(materialsRelatedDetails.dependsOn).toBe('materials_details')
+      const relationIds = materialsRelatedDetails.extractIds([
+        [
+          { id: 12134, upgrades_into: [22222] },
+          { id: 12135, upgrades_from: [11111] },
+        ],
+      ])
+      expect(new Set(relationIds)).toEqual(new Set([22222, 11111]))
+    }
+
     // Account materials are single mode
     expect(accountMaterials?.mode).toBe('single')
     expect(accountMaterials?.path).toBe('/v2/account/materials')
@@ -240,15 +272,95 @@ describe('GW2 endpoint manifest', () => {
     expect(accountEndpoints.map((endpoint) => endpoint.id)).toEqual(['account_wallet'])
   })
 
-  it('includes required dependencies for unlocks-finishers-gliders profile', () => {
-    const publicEndpoints = getPublicEndpointsForProfile('unlocks-finishers-gliders')
-    const accountEndpoints = getAccountEndpointsForProfile('unlocks-finishers-gliders')
+  it('includes required dependencies for unlocks-dev profile', () => {
+    const publicEndpoints = getPublicEndpointsForProfile('unlocks-dev')
+    const accountEndpoints = getAccountEndpointsForProfile('unlocks-dev')
 
     expect(new Set(publicEndpoints.map((endpoint) => endpoint.id))).toEqual(
-      new Set(['finisher_ids', 'finisher_details', 'glider_ids', 'glider_details']),
+      new Set([
+        'currency_metadata',
+        'mount_skin_ids',
+        'mount_skin_details',
+        'dye_catalog_ids',
+        'dye_catalog_details',
+        'finisher_ids',
+        'finisher_details',
+        'finisher_unlock_item_details',
+        'finisher_unlock_related_item_details',
+      ]),
     )
     expect(new Set(accountEndpoints.map((endpoint) => endpoint.id))).toEqual(
-      new Set(['account_finisher_unlocks', 'account_glider_unlocks']),
+      new Set([
+        'account_mount_skin_unlocks',
+        'account_dye_unlocks',
+        'account_finisher_unlocks',
+        'account_glider_unlocks',
+      ]),
+    )
+  })
+
+  it('includes all unlock category endpoints for unlocks profile', () => {
+    const publicEndpoints = getPublicEndpointsForProfile('unlocks')
+    const accountEndpoints = getAccountEndpointsForProfile('unlocks')
+
+    expect(new Set(publicEndpoints.map((endpoint) => endpoint.id))).toEqual(
+      new Set([
+        'currency_metadata',
+        'mini_catalog_ids',
+        'mini_catalog_details',
+        'mount_skin_ids',
+        'mount_skin_details',
+        'dye_catalog_ids',
+        'dye_catalog_details',
+        'mail_carrier_ids',
+        'mail_carrier_details',
+        'finisher_ids',
+        'finisher_details',
+        'finisher_unlock_item_details',
+        'finisher_unlock_related_item_details',
+        'glider_ids',
+        'glider_details',
+        'novelty_ids',
+        'novelty_details',
+        'skiff_ids',
+        'skiff_details',
+        'jadebot_ids',
+        'jadebot_details',
+        'fishing_ids',
+        'fishing_details',
+        'wardrobe_skin_ids',
+        'wardrobe_skin_details',
+        'recipe_ids',
+        'recipe_details',
+        'pvp_hero_ids',
+        'pvp_hero_details',
+        'outfit_ids',
+        'outfit_details',
+        'emote_ids',
+        'emote_details',
+        'upgrade_ids',
+        'upgrade_details',
+      ]),
+    )
+    expect(new Set(accountEndpoints.map((endpoint) => endpoint.id))).toEqual(
+      new Set([
+        'account_mini_unlocks',
+        'account_mount_skin_unlocks',
+        'account_dye_unlocks',
+        'account_mail_carrier_unlocks',
+        'account_finisher_unlocks',
+        'account_glider_unlocks',
+        'account_novelty_unlocks',
+        'account_skiff_unlocks',
+        'account_jadebot_unlocks',
+        'account_fishing_unlocks',
+        'account_wardrobe_unlocks',
+        'account_recipe_unlocks',
+        'account_pvp_hero_unlocks',
+        'account_outfit_unlocks',
+        'account_emote_unlocks',
+        'account_upgrade_unlocks',
+      ]),
     )
   })
 })

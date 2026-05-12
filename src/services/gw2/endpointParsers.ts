@@ -32,6 +32,7 @@ const ENDPOINT_PARSERS: Record<string, EndpointParser> = {
   currency_metadata: parseCurrencyMetadata,
   account_wallet: parseWalletEntries,
   bank_item_details: parseItemDetails,
+  bank_related_item_details: parseItemDetails,
   account_progression: parseAccountProgressionEntries,
   account_luck: parseAccountProgressionEntries,
   inventory_item_details: parseItemDetails,
@@ -47,6 +48,8 @@ const ENDPOINT_PARSERS: Record<string, EndpointParser> = {
   mail_carrier_details: parseObjectEntries,
   finisher_ids: parseNumericIds,
   finisher_details: parseObjectEntries,
+  finisher_unlock_item_details: parseObjectEntries,
+  finisher_unlock_related_item_details: parseObjectEntries,
   glider_ids: parseNumericIds,
   glider_details: parseObjectEntries,
   novelty_ids: parseNumericIds,
@@ -73,7 +76,7 @@ const ENDPOINT_PARSERS: Record<string, EndpointParser> = {
   account_mount_skin_unlocks: parseUnlockIds,
   account_dye_unlocks: parseUnlockIds,
   account_mail_carrier_unlocks: parseUnlockIds,
-  account_finisher_unlocks: parseUnlockIds,
+  account_finisher_unlocks: parseObjectEntries,
   account_glider_unlocks: parseUnlockIds,
   account_novelty_unlocks: parseUnlockIds,
   account_skiff_unlocks: parseUnlockIds,
@@ -88,6 +91,7 @@ const ENDPOINT_PARSERS: Record<string, EndpointParser> = {
   materials_ids: parseNumericIds,
   materials_categories: parseMaterialCategoryEntries,
   materials_details: parseItemDetails,
+  materials_related_item_details: parseItemDetails,
   account_materials: parseAccountMaterialEntries,
 }
 

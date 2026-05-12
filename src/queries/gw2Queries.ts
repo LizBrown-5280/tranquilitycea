@@ -7,12 +7,16 @@ import {
   getActivePublicEndpoints,
 } from '@/services/gw2/endpointManifest'
 import { executeEndpointBatch } from '@/services/gw2/orchestrator'
+import {
+  ACCOUNT_STALE_TIME_MS,
+  getFreshAccountQueryCache,
+  getFreshPublicQueryCache,
+  PUBLIC_STALE_TIME_MS,
+  setAccountQueryCache,
+  setPublicQueryCache,
+} from '@/services/gw2/queryCache'
 import { useGw2KeyStore } from '@/stores/gw2KeyStore'
 import type { Gw2EndpointRunResult, Gw2SectionName } from '@/types/gw2'
-
-const PUBLIC_STALE_TIME_MS = 1000 * 60 * 60 * 48
-const ACCOUNT_STALE_TIME_MS = 1000 * 60 * 60 * 12
-// const ACCOUNT_STALE_TIME_MS = 1000 * 60 * 5
 
 function definePublicSectionQuery(sectionName: Gw2SectionName, keySuffix: string, label: string) {
   return defineQuery(() =>
@@ -20,6 +24,11 @@ function definePublicSectionQuery(sectionName: Gw2SectionName, keySuffix: string
       key: () => ['gw2', 'public', keySuffix, getActiveEndpointProfileKey()],
       staleTime: PUBLIC_STALE_TIME_MS,
       query: async () => {
+        const cachedResults = getFreshPublicQueryCache(keySuffix, PUBLIC_STALE_TIME_MS)
+        if (cachedResults) {
+          return cachedResults
+        }
+
         const profileKey = getActiveEndpointProfileKey()
         const sectionEndpoints = getActivePublicEndpoints().filter(
           (endpoint) => endpoint.section === sectionName,
@@ -33,6 +42,8 @@ function definePublicSectionQuery(sectionName: Gw2SectionName, keySuffix: string
           profileKey,
           label,
         })
+
+        setPublicQueryCache(keySuffix, batch.results)
 
         return batch.results
       },
@@ -72,12 +83,20 @@ export const useGw2AccountBatchQuery = defineQuery(() => {
     staleTime: ACCOUNT_STALE_TIME_MS,
     enabled: () => hasApiKey.value && keyStore.accountFetchRequested,
     query: async () => {
+      const normalizedKey = keyStore.apiKey.trim()
+      const cachedResults = getFreshAccountQueryCache(normalizedKey, ACCOUNT_STALE_TIME_MS)
+      if (cachedResults) {
+        return cachedResults
+      }
+
       const profileKey = getActiveEndpointProfileKey()
       const batch = await executeEndpointBatch(getActiveAccountEndpoints(), {
-        apiKey: keyStore.apiKey,
+        apiKey: normalizedKey,
         profileKey,
         label: 'account',
       })
+
+      setAccountQueryCache(normalizedKey, batch.results)
 
       return batch.results
     },

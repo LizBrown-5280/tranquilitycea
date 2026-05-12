@@ -154,4 +154,102 @@ describe('useGw2BootstrapStore', () => {
     expect(store.activeSectionName).toBeUndefined()
     expect(store.sections.Wallet.state).toBe('partial')
   })
+
+  it('builds bank and material item view models from shared item details', async () => {
+    inventoriesPublicQuery.data.value = [
+      {
+        endpointId: 'materials_categories',
+        section: 'Inventories',
+        scope: 'public',
+        mode: 'csvFrom',
+        ok: true,
+        requestCount: 1,
+        payload: [[{ id: 4, name: 'Cooking Materials', order: 1, items: [19721] }]],
+      },
+      {
+        endpointId: 'materials_details',
+        section: 'Inventories',
+        scope: 'public',
+        mode: 'csvFrom',
+        ok: true,
+        requestCount: 1,
+        payload: [[{ id: 19721, name: 'Pile of Salt', icon: 'https://example.com/salt.png' }]],
+      },
+      {
+        endpointId: 'materials_related_item_details',
+        section: 'Inventories',
+        scope: 'public',
+        mode: 'csvGraphFrom',
+        ok: true,
+        requestCount: 1,
+        payload: [[{ id: 19722, name: 'Fine Pile of Salt' }]],
+      },
+    ]
+
+    accountBatchQuery.data.value = [
+      {
+        endpointId: 'account_bank',
+        section: 'Inventories',
+        scope: 'account',
+        mode: 'single',
+        ok: true,
+        requestCount: 1,
+        payload: [[{ id: 46731, count: 3 }]],
+      },
+      {
+        endpointId: 'bank_item_details',
+        section: 'Inventories',
+        scope: 'account',
+        mode: 'csvFrom',
+        ok: true,
+        requestCount: 1,
+        payload: [[{ id: 46731, name: 'Mystic Coin', upgrades_into: [19722] }]],
+      },
+      {
+        endpointId: 'account_materials',
+        section: 'Inventories',
+        scope: 'account',
+        mode: 'single',
+        ok: true,
+        requestCount: 1,
+        payload: [[{ id: 19721, count: 25 }]],
+      },
+    ]
+
+    const store = useGw2BootstrapStore()
+    await store.setApiKey('inventory-key')
+
+    expect(store.bankItems).toEqual([
+      {
+        slotIndex: 1,
+        id: 46731,
+        count: 3,
+        name: 'Mystic Coin',
+        description: undefined,
+        iconUrl: undefined,
+        type: undefined,
+        rarity: undefined,
+        level: undefined,
+        relatedItemIds: [19722],
+      },
+    ])
+
+    expect(store.materialItems).toEqual([
+      {
+        id: 19721,
+        count: 25,
+        binding: undefined,
+        name: 'Pile of Salt',
+        description: undefined,
+        iconUrl: 'https://example.com/salt.png',
+        type: undefined,
+        rarity: undefined,
+        level: undefined,
+        categoryId: 4,
+        categoryName: 'Cooking Materials',
+        categoryOrder: 1,
+        relatedItemIds: [],
+      },
+    ])
+  })
 })

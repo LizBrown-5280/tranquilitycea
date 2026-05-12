@@ -34,4 +34,11 @@ describe('endpointParsers contract', () => {
 
     expect(parsed).toBe(payload)
   })
+
+  it('preserves finisher account unlock object payloads', () => {
+    const payload = [{ id: 11, permanent: true, quantity: 3 }]
+    const parsed = parseEndpointPayload('account_finisher_unlocks', payload)
+
+    expect(parsed).toEqual(payload)
+  })
 })

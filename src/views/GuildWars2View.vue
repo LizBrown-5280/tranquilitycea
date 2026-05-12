@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 
 import { useGw2BootstrapStore } from '@/stores/gw2Bootstrap'
@@ -36,10 +36,59 @@ const keySuffix = computed(() => {
 
 const accountMenu = [
   {
-    label: 'Currency/Wallet',
-    to: '/guildwars2/account/currency-wallet',
+    section: 'Categories',
+    items: [
+      {
+        label: 'Currency/Wallet',
+        to: '/guildwars2/account/currency-wallet',
+      },
+    ],
+  },
+  {
+    section: 'Inventory Storage',
+    items: [
+      {
+        label: 'Overview',
+        to: '/guildwars2/account/inventories/storage',
+      },
+      {
+        label: 'Bank',
+        to: '/guildwars2/account/inventories/bank',
+      },
+      {
+        label: 'Materials',
+        to: '/guildwars2/account/inventories/materials',
+      },
+    ],
+  },
+  {
+    section: 'Unlocks',
+    items: [
+      {
+        label: 'Overview',
+        to: '/guildwars2/account/unlocks/overview',
+      },
+      {
+        label: 'Finishers',
+        to: '/guildwars2/account/unlocks/finishers',
+      },
+      {
+        label: 'Mounts',
+        to: '/guildwars2/account/unlocks/mounts',
+      },
+      {
+        label: 'Colors',
+        to: '/guildwars2/account/unlocks/colors',
+      },
+    ],
   },
 ]
+
+onMounted(() => {
+  void gw2Store.loadLandingPublic().then(() => {
+    gw2Store.prefetchRemainingPublicInBackground()
+  })
+})
 </script>
 
 <template>
@@ -72,14 +121,16 @@ const accountMenu = [
 
     <section v-if="isAccountRoute" class="account-shell">
       <aside class="account-menu" aria-label="Account categories">
-        <h2>Categories</h2>
-        <ul>
-          <li v-for="item in accountMenu" :key="item.to">
-            <RouterLink :to="item.to" class="menu-link">
-              {{ item.label }}
-            </RouterLink>
-          </li>
-        </ul>
+        <div v-for="menuSection in accountMenu" :key="menuSection.section" class="menu-section">
+          <h2>{{ menuSection.section }}</h2>
+          <ul>
+            <li v-for="item in menuSection.items" :key="item.to">
+              <RouterLink :to="item.to" class="menu-link">
+                {{ item.label }}
+              </RouterLink>
+            </li>
+          </ul>
+        </div>
       </aside>
 
       <div class="account-main">
@@ -203,6 +254,22 @@ const accountMenu = [
 .account-menu h2 {
   margin: 0 0 0.6rem;
   font-size: 1rem;
+}
+
+.menu-section {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.menu-section + .menu-section {
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--ui-border);
+}
+
+.menu-section h2 {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
 }
 
 .account-menu ul {

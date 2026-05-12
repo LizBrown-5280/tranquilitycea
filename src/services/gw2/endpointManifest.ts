@@ -1,11 +1,12 @@
 import type { Gw2EndpointDefinition } from '@/types/gw2'
 
-export type Gw2EndpointProfileKey = 'full' | 'wallet-only' | 'unlocks-finishers-gliders'
+export type Gw2EndpointProfileKey = 'full' | 'wallet-only' | 'unlocks' | 'unlocks-dev'
 
 const KNOWN_PROFILE_KEYS: Gw2EndpointProfileKey[] = [
   'full',
   'wallet-only',
-  'unlocks-finishers-gliders',
+  'unlocks',
+  'unlocks-dev',
 ]
 
 const ENDPOINT_PROFILE_ALLOWLIST: Record<
@@ -13,20 +14,207 @@ const ENDPOINT_PROFILE_ALLOWLIST: Record<
   { public: string[]; account: string[] }
 > = {
   full: {
-    public: [],
-    account: [],
+    public: [
+      'build_info',
+      'mini_catalog_ids',
+      'mini_catalog_details',
+      'mount_skin_ids',
+      'mount_skin_details',
+      'mount_types',
+      'dye_catalog_ids',
+      'dye_catalog_details',
+      'mail_carrier_ids',
+      'mail_carrier_details',
+      'finisher_ids',
+      'finisher_details',
+      'finisher_unlock_item_details',
+      'finisher_unlock_related_item_details',
+      'glider_ids',
+      'glider_details',
+      'novelty_ids',
+      'novelty_details',
+      'skiff_ids',
+      'skiff_details',
+      'jadebot_ids',
+      'jadebot_details',
+      'fishing_ids',
+      'fishing_details',
+      'wardrobe_skin_ids',
+      'wardrobe_skin_details',
+      'recipe_ids',
+      'recipe_details',
+      'pvp_hero_ids',
+      'pvp_hero_details',
+      'outfit_ids',
+      'outfit_details',
+      'emote_ids',
+      'emote_details',
+      'upgrade_ids',
+      'upgrade_details',
+      'currency_metadata',
+      'inventory_item_details',
+      'materials_ids',
+      'materials_categories',
+      'materials_details',
+      'materials_related_item_details',
+    ],
+    account: [
+      'account_overview',
+      'character_names',
+      'character_core_profiles',
+      'character_build_tabs',
+      'character_inventory_snapshots',
+      'account_bank',
+      'bank_item_details',
+      'bank_related_item_details',
+      'account_materials',
+      'account_wallet',
+      'account_mini_unlocks',
+      'account_mount_skin_unlocks',
+      'account_dye_unlocks',
+      'account_mail_carrier_unlocks',
+      'account_finisher_unlocks',
+      'account_glider_unlocks',
+      'account_novelty_unlocks',
+      'account_skiff_unlocks',
+      'account_jadebot_unlocks',
+      'account_fishing_unlocks',
+      'account_wardrobe_unlocks',
+      'account_recipe_unlocks',
+      'account_pvp_hero_unlocks',
+      'account_outfit_unlocks',
+      'account_emote_unlocks',
+      'account_upgrade_unlocks',
+      'account_mastery_points',
+      'account_progression',
+      'account_luck',
+      'account_achievements_page',
+    ],
   },
   'wallet-only': {
     public: ['currency_metadata'],
     account: ['account_wallet'],
   },
-  'unlocks-finishers-gliders': {
-    public: ['finisher_details', 'glider_details'],
-    account: ['account_finisher_unlocks', 'account_glider_unlocks'],
+  'unlocks-dev': {
+    public: [
+      'currency_metadata',
+      'mount_types',
+      'mount_skin_ids',
+      'mount_skin_details',
+      'dye_catalog_ids',
+      'dye_catalog_details',
+      'finisher_ids',
+      'finisher_details',
+      'finisher_unlock_item_details',
+      'finisher_unlock_related_item_details',
+    ],
+    account: [
+      'account_mount_skin_unlocks',
+      'account_dye_unlocks',
+      'account_finisher_unlocks',
+      'account_glider_unlocks',
+    ],
+  },
+  unlocks: {
+    public: [
+      'currency_metadata',
+      'mini_catalog_ids',
+      'mini_catalog_details',
+      'mount_types',
+      'mount_skin_ids',
+      'mount_skin_details',
+      'dye_catalog_ids',
+      'dye_catalog_details',
+      'mail_carrier_ids',
+      'mail_carrier_details',
+      'finisher_ids',
+      'finisher_details',
+      'finisher_unlock_item_details',
+      'finisher_unlock_related_item_details',
+      'glider_ids',
+      'glider_details',
+      'novelty_ids',
+      'novelty_details',
+      'skiff_ids',
+      'skiff_details',
+      'jadebot_ids',
+      'jadebot_details',
+      'fishing_ids',
+      'fishing_details',
+      'wardrobe_skin_ids',
+      'wardrobe_skin_details',
+      'recipe_ids',
+      'recipe_details',
+      'pvp_hero_ids',
+      'pvp_hero_details',
+      'outfit_ids',
+      'outfit_details',
+      'emote_ids',
+      'emote_details',
+      'upgrade_ids',
+      'upgrade_details',
+    ],
+    account: [
+      'account_mini_unlocks',
+      'account_mount_skin_unlocks',
+      'account_dye_unlocks',
+      'account_mail_carrier_unlocks',
+      'account_finisher_unlocks',
+      'account_glider_unlocks',
+      'account_novelty_unlocks',
+      'account_skiff_unlocks',
+      'account_jadebot_unlocks',
+      'account_fishing_unlocks',
+      'account_wardrobe_unlocks',
+      'account_recipe_unlocks',
+      'account_pvp_hero_unlocks',
+      'account_outfit_unlocks',
+      'account_emote_unlocks',
+      'account_upgrade_unlocks',
+    ],
   },
 }
 
 let hasWarnedInvalidProfile = false
+
+function extractNumberArrayField(
+  source: Record<string, unknown>,
+  key: string,
+  output: Set<number>,
+) {
+  const field = source[key]
+  if (!Array.isArray(field)) {
+    return
+  }
+
+  for (const entry of field) {
+    if (typeof entry === 'number') {
+      output.add(entry)
+    }
+  }
+}
+
+function extractIdsFromItemRelations(dependencyPayload: unknown[]) {
+  const ids = new Set<number>()
+
+  for (const payloadEntry of dependencyPayload) {
+    if (!Array.isArray(payloadEntry)) {
+      continue
+    }
+
+    for (const itemEntry of payloadEntry) {
+      if (typeof itemEntry !== 'object' || itemEntry === null) {
+        continue
+      }
+
+      const item = itemEntry as Record<string, unknown>
+      extractNumberArrayField(item, 'upgrades_into', ids)
+      extractNumberArrayField(item, 'upgrades_from', ids)
+    }
+  }
+
+  return Array.from(ids)
+}
 
 const PUBLIC_ENDPOINTS: Gw2EndpointDefinition[] = [
   {
@@ -90,6 +278,17 @@ const PUBLIC_ENDPOINTS: Gw2EndpointDefinition[] = [
 
       return firstPayload.filter((id): id is number => typeof id === 'number')
     },
+  },
+  {
+    id: 'mount_types',
+    description: 'All mount types with skins, skills, and default skin info',
+    scope: 'public',
+    section: 'Account Unlocks',
+    mode: 'csvIds',
+    path: '/v2/mounts/types',
+    csvParam: 'ids',
+    staticIds: ['all'],
+    chunkSize: 1,
   },
   {
     id: 'dye_catalog_ids',
@@ -171,6 +370,58 @@ const PUBLIC_ENDPOINTS: Gw2EndpointDefinition[] = [
 
       return firstPayload.filter((id): id is number => typeof id === 'number')
     },
+  },
+  {
+    id: 'finisher_unlock_item_details',
+    description: 'Item details for finisher unlock item references',
+    scope: 'public',
+    section: 'Account Unlocks',
+    mode: 'csvFrom',
+    path: '/v2/items',
+    dependsOn: 'finisher_details',
+    csvParam: 'ids',
+    chunkSize: 100,
+    extractIds: (dependencyPayload) => {
+      const ids = new Set<number>()
+
+      for (const payloadEntry of dependencyPayload) {
+        if (!Array.isArray(payloadEntry)) {
+          continue
+        }
+
+        for (const finisherEntry of payloadEntry) {
+          if (typeof finisherEntry !== 'object' || finisherEntry === null) {
+            continue
+          }
+
+          const unlockItems = (finisherEntry as Record<string, unknown>).unlock_items
+          if (!Array.isArray(unlockItems)) {
+            continue
+          }
+
+          for (const unlockItem of unlockItems) {
+            if (typeof unlockItem === 'number') {
+              ids.add(unlockItem)
+            }
+          }
+        }
+      }
+
+      return Array.from(ids)
+    },
+  },
+  {
+    id: 'finisher_unlock_related_item_details',
+    description: 'Related item details for finisher unlock items',
+    scope: 'public',
+    section: 'Account Unlocks',
+    mode: 'csvGraphFrom',
+    path: '/v2/items',
+    dependsOn: 'finisher_unlock_item_details',
+    csvParam: 'ids',
+    chunkSize: 100,
+    maxGraphDepth: 4,
+    extractIds: extractIdsFromItemRelations,
   },
   {
     id: 'glider_ids',
@@ -555,6 +806,19 @@ const PUBLIC_ENDPOINTS: Gw2EndpointDefinition[] = [
       return Array.from(ids)
     },
   },
+  {
+    id: 'materials_related_item_details',
+    description: 'Related item details for materials item graph',
+    scope: 'public',
+    section: 'Inventories',
+    mode: 'csvGraphFrom',
+    path: '/v2/items',
+    dependsOn: 'materials_details',
+    csvParam: 'ids',
+    chunkSize: 100,
+    maxGraphDepth: 4,
+    extractIds: extractIdsFromItemRelations,
+  },
 ]
 
 const ACCOUNT_ENDPOINTS: Gw2EndpointDefinition[] = [
@@ -675,6 +939,20 @@ const ACCOUNT_ENDPOINTS: Gw2EndpointDefinition[] = [
 
       return Array.from(ids)
     },
+  },
+  {
+    id: 'bank_related_item_details',
+    description: 'Related item details for bank item graph',
+    scope: 'account',
+    section: 'Inventories',
+    mode: 'csvGraphFrom',
+    path: '/v2/items',
+    dependsOn: 'bank_item_details',
+    csvParam: 'ids',
+    chunkSize: 100,
+    maxGraphDepth: 4,
+    requiredScopes: ['inventories'],
+    extractIds: extractIdsFromItemRelations,
   },
   {
     id: 'account_materials',

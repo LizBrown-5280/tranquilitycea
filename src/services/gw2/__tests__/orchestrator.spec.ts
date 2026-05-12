@@ -46,6 +46,31 @@ describe('executeEndpointBatch', () => {
         return okResponse([{ id: 3 }])
       }
 
+      if (url.pathname === '/v2/items') {
+        const ids = (url.searchParams.get('ids') ?? '')
+          .split(',')
+          .map((entry) => Number(entry))
+          .filter((entry) => Number.isFinite(entry))
+
+        return okResponse(
+          ids.map((id) => {
+            if (id === 100) {
+              return { id, upgrades_into: [200], upgrades_from: [] }
+            }
+
+            if (id === 200) {
+              return { id, upgrades_into: [300], upgrades_from: [100] }
+            }
+
+            if (id === 300) {
+              return { id, upgrades_into: [], upgrades_from: [200] }
+            }
+
+            return { id, upgrades_into: [], upgrades_from: [] }
+          }),
+        )
+      }
+
       if (url.pathname.startsWith('/v2/items/')) {
         const pathParts = url.pathname.split('/')
         return okResponse({ id: pathParts[pathParts.length - 1] })
@@ -143,6 +168,64 @@ describe('executeEndpointBatch', () => {
             : []
         },
       },
+      {
+        id: 'graph_seed',
+        description: 'seed endpoint for graph csv mode',
+        scope: 'public',
+        section: 'Inventories',
+        mode: 'single',
+        path: '/v2/build',
+      },
+      {
+        id: 'csv_graph_from_mode',
+        description: 'csv graph expansion mode',
+        scope: 'public',
+        section: 'Inventories',
+        mode: 'csvGraphFrom',
+        path: '/v2/items',
+        dependsOn: 'graph_seed',
+        chunkSize: 2,
+        maxGraphDepth: 5,
+        extractIds: (dependencyPayload) => {
+          if (!Array.isArray(dependencyPayload[0])) {
+            return [100]
+          }
+
+          const next = new Set<number>()
+          for (const payloadEntry of dependencyPayload) {
+            if (!Array.isArray(payloadEntry)) {
+              continue
+            }
+
+            for (const item of payloadEntry) {
+              if (typeof item !== 'object' || item === null) {
+                continue
+              }
+
+              const record = item as Record<string, unknown>
+              const upgradesInto = record.upgrades_into
+              if (Array.isArray(upgradesInto)) {
+                for (const value of upgradesInto) {
+                  if (typeof value === 'number') {
+                    next.add(value)
+                  }
+                }
+              }
+
+              const upgradesFrom = record.upgrades_from
+              if (Array.isArray(upgradesFrom)) {
+                for (const value of upgradesFrom) {
+                  if (typeof value === 'number') {
+                    next.add(value)
+                  }
+                }
+              }
+            }
+          }
+
+          return Array.from(next)
+        },
+      },
     ]
 
     const batchResult = await executeEndpointBatch(endpoints)
@@ -155,6 +238,8 @@ describe('executeEndpointBatch', () => {
       'expand_seed',
       'expand_mode',
       'csv_from_mode',
+      'graph_seed',
+      'csv_graph_from_mode',
     ])
 
     const requestCountByEndpoint = Object.fromEntries(
@@ -169,9 +254,11 @@ describe('executeEndpointBatch', () => {
       expand_seed: 1,
       expand_mode: 2,
       csv_from_mode: 1,
+      graph_seed: 1,
+      csv_graph_from_mode: 3,
     })
 
-    expect(fetchMock).toHaveBeenCalledTimes(11)
+    expect(fetchMock).toHaveBeenCalledTimes(15)
   })
 
   it('marks endpoint as failed when payload parser rejects response shape', async () => {

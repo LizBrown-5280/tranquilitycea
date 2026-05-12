@@ -8,7 +8,14 @@ export const GW2_SECTIONS = [
 
 export type Gw2SectionName = (typeof GW2_SECTIONS)[number]
 
-export type EndpointMode = 'single' | 'csvIds' | 'csvFrom' | 'paged' | 'byId' | 'expandFrom'
+export type EndpointMode =
+  | 'single'
+  | 'csvIds'
+  | 'csvFrom'
+  | 'csvGraphFrom'
+  | 'paged'
+  | 'byId'
+  | 'expandFrom'
 
 export type Gw2EndpointScope = 'public' | 'account'
 
@@ -101,6 +108,17 @@ export interface Gw2CsvFromEndpointDefinition extends Gw2EndpointDefinitionBase 
   chunkSize?: number
 }
 
+export interface Gw2CsvGraphFromEndpointDefinition extends Gw2EndpointDefinitionBase {
+  mode: 'csvGraphFrom'
+  dependsOn: string
+  extractIds: (dependencyPayload: unknown[]) => Array<string | number>
+  csvParam?: string
+  chunkSize?: number
+  maxGraphDepth?: number
+  /** Optional identifier for category-specific relation extraction */
+  relationId?: string
+}
+
 export interface Gw2PagedEndpointDefinition extends Gw2EndpointDefinitionBase {
   mode: 'paged'
   pageParam?: string
@@ -126,6 +144,7 @@ export type Gw2EndpointDefinition =
   | Gw2SingleEndpointDefinition
   | Gw2CsvIdsEndpointDefinition
   | Gw2CsvFromEndpointDefinition
+  | Gw2CsvGraphFromEndpointDefinition
   | Gw2PagedEndpointDefinition
   | Gw2ByIdEndpointDefinition
   | Gw2ExpandFromEndpointDefinition
@@ -146,6 +165,66 @@ export interface Gw2EndpointRunResult {
 export interface Gw2EndpointBatchResult {
   results: Gw2EndpointRunResult[]
   payloadByEndpoint: Record<string, unknown[]>
+}
+
+/**
+ * Unified hover detail for an unlock item with related items resolved.
+ * This structure allows consistent rendering across different unlock categories.
+ */
+export interface Gw2UnlockDetailItem {
+  id: string | number
+  name: string
+  description?: string
+  iconUrl?: string
+  type?: string
+  rarity?: string
+  level?: number
+  /** Related item details resolved from relation fields */
+  relatedItems?: {
+    relationName: string
+    items: Gw2UnlockDetailItem[]
+  }[]
+  /** Raw API response for category-specific fields */
+  raw: Record<string, unknown>
+}
+
+/**
+ * Represents a single dye slot on a mount skin with resolved color info.
+ */
+export interface Gw2MountDyeSlot {
+  id: number
+  colorId: number
+  colorName?: string
+}
+
+/**
+ * Represents a mount skin with all display properties.
+ */
+export interface Gw2MountSkin {
+  id: number
+  name: string
+  icon?: string
+  dyeSlots?: Gw2MountDyeSlot[]
+  owned?: boolean
+}
+
+/**
+ * Represents a mount type with its associated skins.
+ */
+export interface Gw2MountType {
+  id: string
+  name: string
+  defaultSkinId?: number
+  skins: Gw2MountSkin[]
+}
+
+/**
+ * Mount data organized by type for display.
+ */
+export interface Gw2MountsOrganized {
+  byType: Gw2MountType[]
+  totalSkins: number
+  ownedSkins: number
 }
 
 export interface Gw2BootstrapState {

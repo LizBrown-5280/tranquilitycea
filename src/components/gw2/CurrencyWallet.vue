@@ -12,6 +12,17 @@ import { useGw2BootstrapStore } from '@/stores/gw2Bootstrap'
 const gw2 = useGw2BootstrapStore()
 const isCompact = ref(false)
 const hasAccountKey = computed(() => gw2.apiKey.trim().length > 0)
+const walletEmptyStateText = computed(() => {
+  if (gw2.lifecycle === 'loadingPublic') {
+    return 'Loading currency data…'
+  }
+
+  if (!hasAccountKey.value) {
+    return 'Currency catalog loaded. Add an API key with the wallet scope to see balances.'
+  }
+
+  return 'No wallet currency data is available for the current endpoint profile.'
+})
 </script>
 
 <template>
@@ -28,7 +39,7 @@ const hasAccountKey = computed(() => gw2.apiKey.trim().length > 0)
       </button>
     </header>
 
-    <p v-if="gw2.walletCurrencies.length === 0" class="empty-state">Loading currency data…</p>
+    <p v-if="gw2.walletCurrencies.length === 0" class="empty-state">{{ walletEmptyStateText }}</p>
     <ul v-else class="currency-list" :class="{ 'currency-list--compact': isCompact }">
       <li class="currency-row currency-row--header" aria-hidden="true">
         <span class="currency-column-title">Currency</span>

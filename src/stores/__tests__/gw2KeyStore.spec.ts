@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGw2KeyStore } from '@/stores/gw2KeyStore'
 
+vi.mock('@/services/gw2/queryCache', () => ({
+  ACCOUNT_STALE_TIME_MS: 1000,
+  clearAllAccountQueryCache: vi.fn(),
+}))
+
+import { clearAllAccountQueryCache } from '@/services/gw2/queryCache'
+
 class LocalStorageMock {
   private store = new Map<string, string>()
 
@@ -27,9 +34,10 @@ describe('useGw2KeyStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.stubGlobal('localStorage', new LocalStorageMock())
+    vi.mocked(clearAllAccountQueryCache).mockClear()
   })
 
-  it('restores a persisted key and enables account fetch on initialization', () => {
+  it('restores a persisted key and auto-enables account fetch on initialization', () => {
     localStorage.setItem('gw2:apiKey', 'stored-key')
 
     const store = useGw2KeyStore()
@@ -56,5 +64,6 @@ describe('useGw2KeyStore', () => {
     expect(store.apiKey).toBe('')
     expect(store.accountFetchRequested).toBe(false)
     expect(localStorage.getItem('gw2:apiKey')).toBeNull()
+    expect(clearAllAccountQueryCache).toHaveBeenCalledTimes(1)
   })
 })

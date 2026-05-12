@@ -25,6 +25,7 @@ const DEFAULT_PAGE_PARAM = 'page'
 const DEFAULT_PAGE_SIZE_PARAM = 'page_size'
 const DEFAULT_PAGE_SIZE = 50
 const DEFAULT_CHUNK_SIZE = 50
+const DEFAULT_GRAPH_MAX_DEPTH = 3
 
 function chunkValues<T>(values: T[], chunkSize: number): T[][] {
   const chunks: T[][] = []
@@ -85,7 +86,10 @@ async function executeEndpoint(
   const errors: string[] = []
   const errorTypes = new Set<Gw2EndpointErrorType>()
 
-  const request = async (path: string, query?: Record<string, string | number>) => {
+  const request = async (
+    path: string,
+    query?: Record<string, string | number>,
+  ): Promise<unknown | undefined> => {
     result.requestCount += 1
 
     const response = await requestJson(path, {
@@ -95,20 +99,22 @@ async function executeEndpoint(
 
     if (!response.ok) {
       if (response.status === 404 && OPTIONAL_ON_404_ENDPOINT_IDS.has(endpoint.id)) {
-        return
+        return undefined
       }
 
       errors.push(response.error ?? 'Unknown request error')
       errorTypes.add(classifyHttpError(response.status, endpoint))
-      return
+      return undefined
     }
 
     try {
       const parsedPayload = parseEndpointPayload(endpoint.id, response.data)
       result.payload.push(parsedPayload)
+      return parsedPayload
     } catch (error) {
       errors.push(error instanceof Error ? error.message : 'Failed to parse endpoint payload')
       errorTypes.add('parser')
+      return undefined
     }
   }
 
@@ -138,6 +144,58 @@ async function executeEndpoint(
       await request(endpoint.path, {
         [csvParam]: chunk.join(','),
       })
+    }
+  }
+
+  if (endpoint.mode === 'csvGraphFrom') {
+    const dependencyPayload = options.payloadByEndpoint?.[endpoint.dependsOn] ?? []
+    const csvParam = endpoint.csvParam ?? DEFAULT_CSV_PARAM
+    const chunkSize = endpoint.chunkSize ?? DEFAULT_CHUNK_SIZE
+    const maxDepth = endpoint.maxGraphDepth ?? DEFAULT_GRAPH_MAX_DEPTH
+    const visitedIds = new Set<string>()
+
+    let frontier = endpoint
+      .extractIds(dependencyPayload)
+      .map((value) => String(value))
+      .filter((id) => {
+        if (visitedIds.has(id)) {
+          return false
+        }
+
+        visitedIds.add(id)
+        return true
+      })
+
+    let depth = 0
+
+    while (frontier.length > 0 && depth < maxDepth) {
+      const wavePayload: unknown[] = []
+      const chunks = chunkValues(frontier, chunkSize)
+
+      for (const chunk of chunks) {
+        const parsedPayload = await request(endpoint.path, {
+          [csvParam]: chunk.join(','),
+        })
+
+        if (parsedPayload !== undefined) {
+          wavePayload.push(parsedPayload)
+        }
+      }
+
+      const nextIds = endpoint
+        .extractIds(wavePayload)
+        .map((value) => String(value))
+        .filter((id) => {
+          if (visitedIds.has(id)) {
+            return false
+          }
+
+          visitedIds.add(id)
+          return true
+        })
+
+      frontier = nextIds
+      depth += 1
     }
   }
 

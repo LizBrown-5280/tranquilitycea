@@ -19,6 +19,20 @@ Use one of these phrases in your prompt:
 - `done`: Implemented and validated.
 - `deferred`: Parked for later.
 
+## Recent Progress
+
+- May 9, 2026: Added batched GW2 item lookup expansion using comma-delimited `ids` requests with chunking, recursive graph expansion, visited-id dedupe, and depth guards.
+- May 9, 2026: Finishers now resolve `unlock_items` against `/v2/items`, including related item chains exposed through item contracts.
+- May 9, 2026: Shared normalized item lookup data now feeds unlocks, bank, and materials from the GW2 bootstrap store.
+- May 9, 2026: Inventory Storage was split into its own section with Overview, Bank, and Materials pages so long collections are easier to navigate.
+- May 9, 2026: Added Unlocks Overview as a section landing page so unlock families can follow the same section pattern without forcing a combined long grid.
+
+## Suggested Next Slice
+
+- Short term: expand unlock coverage beyond Finishers, Mounts, and Colors using the same shared item resolver and section-overview pattern.
+- Short term: enrich hover cards with more item-contract fields from `details` for categories and inventory items that benefit from deeper metadata.
+- Short term: add pagination or show-more behavior for long collections, especially Bank, Materials, and future large unlock categories.
+
 ## Intake Template
 
 Copy and fill this format when adding an item:

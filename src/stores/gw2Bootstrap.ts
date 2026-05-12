@@ -3,11 +3,24 @@ import { defineStore } from 'pinia'
 
 import { aggregateAllSections, createInitialSections } from '@/services/gw2/aggregators'
 import { flattenPayloadEntries, getSectionResults } from '@/services/gw2/aggregators/helpers'
+import { buildFinisherDetailsWithRelations } from '@/services/gw2/aggregators/finisherDetails'
+import { buildMountDetailsWithRelations } from '@/services/gw2/aggregators/mountDetails'
+import { buildMountsByType } from '@/services/gw2/aggregators/mountsByType'
 import {
   getActiveAccountEndpoints,
   getActivePublicEndpoints,
 } from '@/services/gw2/endpointManifest'
-import { parseCurrencyMetadata, parseWalletEntries } from '@/services/gw2/payloadParsers'
+import {
+  buildGw2ItemMapFromEndpointResults,
+  type Gw2NormalizedItem,
+} from '@/services/gw2/itemViewModel'
+import {
+  parseAccountMaterialEntries,
+  parseBankSlotEntries,
+  parseCurrencyMetadata,
+  parseMaterialCategoryEntries,
+  parseWalletEntries,
+} from '@/services/gw2/payloadParsers'
 import {
   useGw2AccountBatchQuery,
   useGw2InventoriesPublicQuery,
@@ -21,6 +34,50 @@ import type { Gw2BootstrapState, Gw2EndpointRunResult, Gw2LifecycleStatus } from
 
 export const useGw2BootstrapStore = defineStore('gw2Bootstrap', () => {
   const keyStore = useGw2KeyStore()
+  const SHARED_ITEM_ENDPOINT_IDS = [
+    'finisher_unlock_item_details',
+    'finisher_unlock_related_item_details',
+    'materials_details',
+    'materials_related_item_details',
+    'bank_item_details',
+    'bank_related_item_details',
+    'inventory_item_details',
+  ]
+
+  function getEntriesForEndpoint(endpointId: string): unknown[] {
+    return flattenPayloadEntries(
+      allResults.value
+        .filter((result) => result.endpointId === endpointId)
+        .flatMap((result) => result.payload),
+    )
+  }
+
+  function getRelationIds(item?: Gw2NormalizedItem): number[] {
+    if (!item) {
+      return []
+    }
+
+    const relationIds = new Set<number>()
+    const upgradesInto = item.raw.upgrades_into
+    if (Array.isArray(upgradesInto)) {
+      for (const id of upgradesInto) {
+        if (typeof id === 'number') {
+          relationIds.add(id)
+        }
+      }
+    }
+
+    const upgradesFrom = item.raw.upgrades_from
+    if (Array.isArray(upgradesFrom)) {
+      for (const id of upgradesFrom) {
+        if (typeof id === 'number') {
+          relationIds.add(id)
+        }
+      }
+    }
+
+    return Array.from(relationIds)
+  }
 
   const getActiveEndpointTotals = () => {
     const publicEndpoints = getActivePublicEndpoints()
@@ -156,6 +213,80 @@ export const useGw2BootstrapStore = defineStore('gw2Bootstrap', () => {
     }))
   })
 
+  const itemDetailsById = computed(() =>
+    buildGw2ItemMapFromEndpointResults(allResults.value, SHARED_ITEM_ENDPOINT_IDS),
+  )
+
+  const bankItems = computed(() => {
+    const bankSlots = parseBankSlotEntries(getEntriesForEndpoint('account_bank'))
+
+    return bankSlots.map((slot, index) => {
+      const details = itemDetailsById.value.get(slot.id)
+
+      return {
+        slotIndex: index + 1,
+        id: slot.id,
+        count: slot.count,
+        name: details?.name ?? `Item ${slot.id}`,
+        description: details?.description,
+        iconUrl: details?.iconUrl,
+        type: details?.type,
+        rarity: details?.rarity,
+        level: details?.level,
+        relatedItemIds: getRelationIds(details),
+      }
+    })
+  })
+
+  const materialItems = computed(() => {
+    const materialCategories = parseMaterialCategoryEntries(
+      getEntriesForEndpoint('materials_categories'),
+    )
+    const accountMaterials = parseAccountMaterialEntries(getEntriesForEndpoint('account_materials'))
+
+    const categoryByItemId = new Map<number, { id: number; name?: string; order?: number }>()
+    for (const category of materialCategories) {
+      for (const itemId of category.items ?? []) {
+        categoryByItemId.set(itemId, {
+          id: category.id,
+          name: category.name,
+          order: category.order,
+        })
+      }
+    }
+
+    return accountMaterials
+      .filter((material) => material.count > 0)
+      .map((material) => {
+        const details = itemDetailsById.value.get(material.id)
+        const category = categoryByItemId.get(material.id)
+
+        return {
+          id: material.id,
+          count: material.count,
+          binding: material.binding,
+          name: details?.name ?? `Material ${material.id}`,
+          description: details?.description,
+          iconUrl: details?.iconUrl,
+          type: details?.type,
+          rarity: details?.rarity,
+          level: details?.level,
+          categoryId: category?.id,
+          categoryName: category?.name,
+          categoryOrder: category?.order ?? Number.POSITIVE_INFINITY,
+          relatedItemIds: getRelationIds(details),
+        }
+      })
+      .sort((left, right) => {
+        const categoryDelta = left.categoryOrder - right.categoryOrder
+        if (categoryDelta !== 0) {
+          return categoryDelta
+        }
+
+        return left.name.localeCompare(right.name)
+      })
+  })
+
   const orderedSections = computed(() =>
     GW2_SECTIONS.map((sectionName) => sections.value[sectionName]),
   )
@@ -168,6 +299,34 @@ export const useGw2BootstrapStore = defineStore('gw2Bootstrap', () => {
       progressionPublicQuery.refresh(),
     ])
   }
+
+  async function loadLandingPublic() {
+    console.log('[Bootstrap] loadLandingPublic starting...')
+    await Promise.all([walletPublicQuery.refresh(), progressionPublicQuery.refresh()])
+    console.log('[Bootstrap] loadLandingPublic done, unlocks data not loaded yet (in background)')
+  }
+
+  function prefetchRemainingPublicInBackground() {
+    console.log('[Bootstrap] prefetchRemainingPublicInBackground starting...')
+    void unlocksPublicQuery.refresh().then(() => {
+      console.log('[Bootstrap] unlocks query completed')
+    })
+    void inventoriesPublicQuery.refresh().then(() => {
+      console.log('[Bootstrap] inventories query completed')
+    })
+  }
+
+  async function ensureUnlocksDataLoaded() {
+    console.log('[Bootstrap] ensureUnlocksDataLoaded called')
+    await unlocksPublicQuery.refresh()
+    console.log('[Bootstrap] ensureUnlocksDataLoaded completed')
+  }
+
+  const finisherDetails = computed(() => buildFinisherDetailsWithRelations(allResults.value))
+
+  const mountDetails = computed(() => buildMountDetailsWithRelations(allResults.value))
+
+  const mountsByType = computed(() => buildMountsByType(allResults.value))
 
   async function setApiKey(key?: string) {
     const normalizedKey = key?.trim() ?? ''
@@ -188,6 +347,7 @@ export const useGw2BootstrapStore = defineStore('gw2Bootstrap', () => {
 
   return {
     apiKey: computed(() => keyStore.apiKey),
+    allResults,
     lifecycle,
     progress,
     activeSectionName,
@@ -195,7 +355,16 @@ export const useGw2BootstrapStore = defineStore('gw2Bootstrap', () => {
     sections,
     orderedSections,
     walletCurrencies,
+    itemDetailsById,
+    bankItems,
+    materialItems,
+    finisherDetails,
+    mountDetails,
+    mountsByType,
     loadPublic,
+    loadLandingPublic,
+    prefetchRemainingPublicInBackground,
+    ensureUnlocksDataLoaded,
     setApiKey,
     reset,
   }

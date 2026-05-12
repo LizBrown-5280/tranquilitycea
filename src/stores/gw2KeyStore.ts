@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
+import { clearAllAccountQueryCache } from '@/services/gw2/queryCache'
 
 const GW2_API_KEY_STORAGE_KEY = 'gw2:apiKey'
 
@@ -34,8 +35,9 @@ function persistApiKey(apiKey: string) {
 
 export const useGw2KeyStore = defineStore('gw2Key', () => {
   const storedApiKey = loadStoredApiKey()
+  const normalizedStoredKey = storedApiKey.trim()
   const apiKey = ref(storedApiKey)
-  const accountFetchRequested = ref(storedApiKey.trim().length > 0)
+  const accountFetchRequested = ref(normalizedStoredKey.length > 0)
 
   function setApiKey(nextKey: string) {
     apiKey.value = nextKey
@@ -50,6 +52,7 @@ export const useGw2KeyStore = defineStore('gw2Key', () => {
     apiKey.value = ''
     accountFetchRequested.value = false
     persistApiKey('')
+    clearAllAccountQueryCache()
   }
 
   return {

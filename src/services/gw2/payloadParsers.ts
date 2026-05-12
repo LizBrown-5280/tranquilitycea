@@ -53,6 +53,8 @@ export interface Gw2AccountMaterialEntry {
 export interface Gw2ItemDetail extends BaseIconEntity {
   id: number
   name?: string
+  upgrades_into?: number[]
+  upgrades_from?: number[]
 }
 
 export interface Gw2RecipeDetail extends BaseIconEntity {
@@ -109,6 +111,15 @@ function getStringField(value: Record<string, unknown>, key: string): string | u
 function getNumberField(value: Record<string, unknown>, key: string): number | undefined {
   const field = value[key]
   return typeof field === 'number' ? field : undefined
+}
+
+function getNumberArrayField(value: Record<string, unknown>, key: string): number[] | undefined {
+  const field = value[key]
+  if (!Array.isArray(field)) {
+    return undefined
+  }
+
+  return field.filter((entry): entry is number => typeof entry === 'number')
 }
 
 export function parseCharacterNames(entries: unknown[]): string[] {
@@ -360,6 +371,8 @@ export function parseCurrencyMetadata(entries: unknown[]): Gw2CurrencyMetadata[]
     const icon = getStringField(entry, 'icon')
     const iconUrl = getStringField(entry, 'iconUrl') ?? getStringField(entry, 'icon_url')
     const iconBig = getStringField(entry, 'icon_big')
+    const upgradesInto = getNumberArrayField(entry, 'upgrades_into')
+    const upgradesFrom = getNumberArrayField(entry, 'upgrades_from')
 
     if (name) {
       currency.name = name
@@ -441,6 +454,8 @@ export function parseItemDetails(entries: unknown[]): Gw2ItemDetail[] {
     const icon = getStringField(entry, 'icon')
     const iconUrl = getStringField(entry, 'iconUrl') ?? getStringField(entry, 'icon_url')
     const iconBig = getStringField(entry, 'icon_big')
+    const upgradesInto = getNumberArrayField(entry, 'upgrades_into')
+    const upgradesFrom = getNumberArrayField(entry, 'upgrades_from')
 
     if (name) {
       item.name = name
@@ -453,6 +468,12 @@ export function parseItemDetails(entries: unknown[]): Gw2ItemDetail[] {
     }
     if (iconBig) {
       item.icon_big = iconBig
+    }
+    if (upgradesInto && upgradesInto.length > 0) {
+      item.upgrades_into = upgradesInto
+    }
+    if (upgradesFrom && upgradesFrom.length > 0) {
+      item.upgrades_from = upgradesFrom
     }
 
     items.push(item)
