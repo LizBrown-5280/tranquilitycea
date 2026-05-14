@@ -58,7 +58,9 @@ src/
   router/               # Vue Router config
   assets/               # Global CSS vars and base styles
 docs/
+  architecture-intake-checklist.md  # API/data architecture checklist and guardrails
   canasta-feature-backlog.md  # Feature backlog and future ideas
+  gw2-feature-backlog.md      # GW2-focused backlog and planning notes
 ```
 
 ---

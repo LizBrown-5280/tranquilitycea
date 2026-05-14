@@ -47,30 +47,26 @@ Copy and fill this format when adding an item:
 
 ## Current Backlog
 
-- `id`: G-001
-- `title`: Surface account overview fields from /v2/account
-- `status`: planned
-- `summary`: The `account_overview` endpoint is already fetched but nearly all useful fields are discarded. Expose `name`, `fractal_level`, `daily_ap`, `monthly_ap`, `wvw_rank`, `created`, and `access` as display rows and metric cards in the Progression section.
-- `user-value`: Players get a meaningful at-a-glance identity and stat summary without needing a separate lookup.
-- `acceptance-criteria`:
-  - Account name, world, fractal level, daily AP, monthly AP, WvW rank, and account age are extracted from the payload.
-  - New metric cards appear in the Progression section for at minimum fractal level, AP totals, and WvW rank.
-  - Display rows emit `progression display row:` strings for each surfaced field.
-  - Aggregator unit tests cover the new extraction logic.
-  - No previously-passing tests are broken.
-- `notes`: `account_overview` is in the `account` scope section — requires API key. Fields with zero or null values should use `attention` tone. Account age should be computed from `created` date.
+- Account name, world, fractal level, daily AP, monthly AP, WvW rank, and account age are extracted from the payload.
+- New metric cards appear in the Progression section for at minimum fractal level, AP totals, and WvW rank.
+- Display rows emit `progression display row:` strings for each surfaced field.
+- Aggregator unit tests cover the new extraction logic.
+- No previously-passing tests are broken.
 
+- `id`: G-004
+  `title`: Remove account key when cache is stale
+  `status`: idea
+  `summary`: When the account data cache expires and is cleared, also remove the stored API key. This prevents confusion where a key is shown but no account data loads, making the UX more predictable.
+  `user-value`: Users won't see an API key present with missing account data, reducing confusion and support requests.
+  `acceptance-criteria`:
+  - When account cache is cleared due to staleness, the stored API key is also removed.
+  - On next load, the UI behaves as if no key is present (locked state, prompt for key, etc.).
+  - No accidental key removal if cache is still valid.
+    `notes`: This should be coordinated with cache expiry logic in queryCache and key store persistence.
 - `id`: G-002
-- `title`: Mastery points display rows
-- `status`: idea
-- `summary`: `account_mastery_points` is fetched and counted, but individual mastery region entries (Central Tyria, Heart of Thorns, etc.) are never rendered. Add per-region breakdown as display rows in the Progression section.
-- `user-value`: Players can see how their mastery progress is distributed across expansions.
-- `acceptance-criteria`:
-  - Each mastery region entry appears as a `progression display row:` string with region name and point total.
   - Metric card value reflects total points, badge reflects region count.
   - Unit tests cover region row generation.
 - `notes`: The payload is an array of `{ region, spent, earned }` objects.
-
 - `id`: G-003
 - `title`: Move AccountUnlockDisplayRow type into types/gw2.ts
 - `status`: idea
@@ -148,14 +144,40 @@ Copy and fill this format when adding an item:
   - Caps can remain in place for initial render performance; expansion is on-demand.
 - `notes`: Largest impact is Wardrobe Skins (thousands of items). Tackle unlock categories before wallet/bank.
 
+- `id`: G-010
+- `title`: Remove progressionPublicQuery from loadLandingPublic(), start with wallet
+- `status`: planned
+- `summary`: The `loadLandingPublic()` call currently includes `progressionPublicQuery`, which brings in progression/account data that isn't yet integrated into the wallet display. Remove progression from the initial load and focus on wallet-only load path. Progression will be added back later as a separate query once wallet features are stable.
+- `user-value`: Reduces initial load scope; allows wallet feature development to proceed without progression dependencies; simplifies incremental feature delivery.
+- `acceptance-criteria`:
+  - `progressionPublicQuery` is removed from `loadLandingPublic()`.
+  - Wallet data still loads and displays correctly.
+  - No console errors related to missing progression data.
+  - Tests verify wallet-only load path works as expected.
+- `notes`: Progression query will be added back later as a deferred task once wallet is mature enough to integrate additional account metrics.
+
+- `id`: G-011
+- `title`: Loading spinners and left sidebar menu styling refinement
+- `status`: idea
+- `summary`: The left sidebar menu is currently intrusive and takes up significant visual space. Add loading spinners to individual menu items to show section load progress, and refine the sidebar styling to be more compact and less prominent (smaller font, reduced padding, optional collapse affordance).
+- `user-value`: Better UX feedback during section loads; cleaner, less cluttered layout that keeps focus on content.
+- `acceptance-criteria`:
+  - Loading state spinners appear on individual menu items as their sections load.
+  - Left sidebar styling is refined (smaller font, reduced padding, optional collapse).
+  - Layout remains accessible and readable at smaller widths.
+  - No layout shift when spinners appear/disappear.
+- `notes`: Consider whether sidebar should be collapsible on mobile. Finalize style direction (e.g., icon-only vs. text + icon) in design pass.
+
 ## Prioritization Queue
 
 1. G-001 Surface account overview fields
 2. G-003 Move AccountUnlockDisplayRow type into types/gw2.ts
-3. G-004 Wallet locked/no-key empty state
-4. G-002 Mastery points display rows
-5. G-005 Extract metric helper logic from view
-6. G-007 fatalError lifecycle state handling
-7. G-006 Loading skeleton during public phase
-8. G-008 Achievement sample display rows
-9. G-009 Paginated / "show more" for capped display lists
+3. G-010 Remove progressionPublicQuery from loadLandingPublic(), start with wallet
+4. G-004 Wallet locked/no-key empty state
+5. G-002 Mastery points display rows
+6. G-005 Extract metric helper logic from view
+7. G-007 fatalError lifecycle state handling
+8. G-011 Loading spinners and left sidebar menu styling refinement
+9. G-006 Loading skeleton during public phase
+10. G-008 Achievement sample display rows
+11. G-009 Paginated / "show more" for capped display lists
