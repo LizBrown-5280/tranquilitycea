@@ -40,6 +40,7 @@ describe('unlockDetailBuilder', () => {
       type: 'armor',
       rarity: 'rare',
       level: 80,
+      vendor_value: 12345,
     }
 
     const item = buildUnlockDetailItem(entry)
@@ -51,6 +52,7 @@ describe('unlockDetailBuilder', () => {
     expect(item.type).toBe('armor')
     expect(item.rarity).toBe('rare')
     expect(item.level).toBe(80)
+    expect(item.vendorValue).toBe(12345)
   })
 
   it('resolves related items when relation configs are provided', () => {

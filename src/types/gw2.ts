@@ -176,6 +176,9 @@ export interface Gw2UnlockDetailItem {
   name: string
   description?: string
   iconUrl?: string
+  vendorValue?: number
+  owned?: boolean
+  accountRaw?: Record<string, unknown>
   type?: string
   rarity?: string
   level?: number

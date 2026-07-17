@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 import HoverCard from '@/components/gw2/base/HoverCard.vue'
-import UnlockTile from '@/components/gw2/base/itemCard.vue'
+import ItemTile from '@/components/gw2/base/itemCard.vue'
 import type { UnlockDetailField } from '@/services/gw2/unlockCategoryViewModel'
 import { useGw2BootstrapStore } from '@/stores/gw2Bootstrap'
 
@@ -65,7 +65,7 @@ function getBankFields(item: (typeof bankItems.value)[number]): UnlockDetailFiel
     <p v-else-if="bankItems.length === 0" class="storage-page__empty">Loading bank items…</p>
 
     <div v-else class="storage-grid">
-      <UnlockTile
+      <ItemTile
         v-for="item in bankItems"
         :key="`bank-${item.slotIndex}-${item.id}`"
         :name="item.name"
@@ -78,9 +78,11 @@ function getBankFields(item: (typeof bankItems.value)[number]): UnlockDetailFiel
             :title="item.name"
             :description="item.description"
             :fields="getBankFields(item)"
+            api-endpoint-path="items"
+            :api-endpoint-id="item.id"
           />
         </template>
-      </UnlockTile>
+      </ItemTile>
     </div>
   </section>
 </template>

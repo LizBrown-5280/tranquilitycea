@@ -15,6 +15,7 @@ export interface UnlockDetailField {
   label: string
   value: string
   emphasis?: boolean
+  coinValueInCopper?: number
 }
 
 export interface UnlockItemViewModel {
@@ -180,28 +181,4 @@ export function sortUnlockItems(
 
     return left.name.localeCompare(right.name)
   })
-}
-
-export function buildUnlockDetailFields(
-  item: UnlockItemViewModel,
-  keys: Array<{ key: string; label: string }>,
-  options?: { includeDescription?: boolean },
-): UnlockDetailField[] {
-  const fields: UnlockDetailField[] = []
-  const includeDescription = options?.includeDescription ?? true
-
-  if (includeDescription && item.description) {
-    fields.push({ label: 'Description', value: item.description })
-  }
-
-  for (const field of keys) {
-    const value = normalizeValue(item.raw[field.key])
-    if (!value) {
-      continue
-    }
-
-    fields.push({ label: field.label, value })
-  }
-
-  return fields
 }

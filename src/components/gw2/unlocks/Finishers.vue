@@ -2,98 +2,117 @@
 import { computed, ref } from 'vue'
 
 import HoverCard from '@/components/gw2/base/HoverCard.vue'
-import UnlockTile from '@/components/gw2/base/itemCard.vue'
+import ItemTile from '@/components/gw2/base/itemCard.vue'
 import UnlockPlanningGrid from '@/components/gw2/unlocks/UnlockPlanningGrid.vue'
 import { buildUnlockDetailFields } from '@/services/gw2/unlockDetailDisplay'
+import { groupFinishers } from '@/composables/useFinisherGrouping'
+import { withPlaceFallback, findSecondPlaceFinisher } from '@/services/gw2/finisherPlaceLogic'
+import { getBindingStatus } from '@/composables/useFinisherBinding'
 import { useGw2BootstrapStore } from '@/stores/gw2Bootstrap'
 import type { Gw2UnlockDetailItem } from '@/types/gw2'
 
 const gw2 = useGw2BootstrapStore()
-const sortMode = ref<'grouped' | 'alphabetical'>('grouped')
+const hasApiKey = computed(() => gw2.apiKey.trim().length > 0)
 
-type FinisherGroup = {
-  label: string
-  matches?: (item: Gw2UnlockDetailItem) => boolean
-}
+function getAccountAvailabilityText(item: Gw2UnlockDetailItem): string | undefined {
+  const permanent = item.accountRaw?.permanent
+  const quantity = item.accountRaw?.quantity
 
-function includesIgnoreCase(value: string | undefined, token: string) {
-  return (value ?? '').toLowerCase().includes(token.toLowerCase())
-}
+  const hasPermanent = typeof permanent === 'boolean'
+  const hasQuantity = typeof quantity === 'number' && Number.isFinite(quantity)
 
-function isPvpOrWvw(item: Gw2UnlockDetailItem) {
-  const relatedText =
-    item.relatedItems
-      ?.flatMap((relation) => relation.items)
-      .map((relatedItem) => `${relatedItem.name} ${relatedItem.description ?? ''}`)
-      .join(' ') ?? ''
-
-  const haystack = [item.name, item.description, item.type, JSON.stringify(item.raw), relatedText]
-    .join(' ')
-    .toLowerCase()
-
-  return (
-    haystack.includes('pvp') ||
-    haystack.includes('player vs player') ||
-    haystack.includes('wvw') ||
-    haystack.includes('world vs world') ||
-    haystack.includes('world versus world')
-  )
-}
-
-const GROUPS: FinisherGroup[] = [
-  { label: 'Mordrem', matches: (item) => includesIgnoreCase(item.name, 'Mordrem') },
-  {
-    label: 'Place',
-    matches: (item) =>
-      includesIgnoreCase(item.name, 'Place') && !includesIgnoreCase(item.name, 'World Tournament'),
-  },
-  { label: 'Rank', matches: (item) => includesIgnoreCase(item.name, 'Rank') },
-  {
-    label: 'World Tournament',
-    matches: (item) => includesIgnoreCase(item.name, 'World Tournament'),
-  },
-  { label: 'PvP & WvW', matches: (item) => isPvpOrWvw(item) },
-  { label: 'Other' },
-]
-
-const finisherGroups = computed(() => {
-  const details = [...gw2.finisherDetails].sort((a, b) => a.name.localeCompare(b.name))
-  const assigned = new Set<string>()
-
-  return GROUPS.map((group) => {
-    const items = details.filter((item) => {
-      const key = String(item.id)
-      if (assigned.has(key)) {
-        return false
-      }
-
-      const isMatch = group.matches ? group.matches(item) : true
-      if (!isMatch) {
-        return false
-      }
-
-      assigned.add(key)
-      return true
-    })
-
-    return { label: group.label, items }
-  }).filter((group) => group.items.length > 0)
-})
-
-const displaySections = computed(() => {
-  if (sortMode.value === 'grouped') {
-    return finisherGroups.value
+  if (!hasPermanent && !hasQuantity) {
+    return undefined
   }
 
-  const alphabetical = [...gw2.finisherDetails].sort((a, b) => a.name.localeCompare(b.name))
-  return [{ label: 'All Finishers (A-Z)', items: alphabetical }]
+  const status = hasPermanent
+    ? permanent
+      ? 'Permanent'
+      : 'Temporary - remaining'
+    : 'Temporary - remaining'
+
+  if (!hasQuantity) {
+    return status
+  }
+
+  return `${status}: ${quantity.toLocaleString()}`
+}
+
+const sortMode = ref<'grouped' | 'alphabetical'>('grouped')
+const secondPlaceFinisher = computed(() => findSecondPlaceFinisher(gw2.finisherDetails))
+
+const displaySections = computed(() => {
+  const details = [...gw2.finisherDetails].sort((a, b) => a.name.localeCompare(b.name))
+  if (sortMode.value === 'grouped') {
+    return groupFinishers(details)
+  }
+  return [{ label: 'All Finishers (A-Z)', items: details }]
 })
 
 function getFields(item: Gw2UnlockDetailItem) {
-  return buildUnlockDetailFields(item, [
-    { key: 'type', label: 'Type' },
-    { key: 'unlock_type', label: 'Unlock Type' },
-  ])
+  const displayItem = withPlaceFallback(item, secondPlaceFinisher.value)
+  const fields = buildUnlockDetailFields(
+    displayItem,
+    [
+      { key: 'type', label: 'Type' },
+      { key: 'unlock_type', label: 'Unlock Type' },
+    ],
+    {
+      includeVendorValueAsCoin: hasApiKey.value,
+    },
+  )
+  const bindingStatus = getBindingStatus(
+    displayItem,
+    (i) => withPlaceFallback(i, secondPlaceFinisher.value),
+    (i) => !!withPlaceFallback(i, secondPlaceFinisher.value),
+    secondPlaceFinisher.value,
+  )
+  if (bindingStatus) {
+    fields.push({
+      label: bindingStatus,
+      value: '',
+    })
+  }
+  const accountAvailability = getAccountAvailabilityText(displayItem)
+  if (accountAvailability) {
+    fields.push({
+      label: 'Availability',
+      value: accountAvailability,
+      emphasis: true,
+    })
+  }
+  return fields
+}
+
+function getPrimaryUnlockItemId(item: Gw2UnlockDetailItem): number | undefined {
+  const displayItem = withPlaceFallback(item, secondPlaceFinisher.value)
+  const unlockItemsRaw = displayItem.raw.unlock_items
+  if (Array.isArray(unlockItemsRaw)) {
+    for (const value of unlockItemsRaw) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value
+      }
+      const parsed = parseInt(String(value), 10)
+      if (Number.isFinite(parsed)) {
+        return parsed
+      }
+    }
+  }
+  if (typeof displayItem.id === 'number' && Number.isFinite(displayItem.id)) {
+    return displayItem.id
+  }
+  const parsedDisplayId = parseInt(String(displayItem.id), 10)
+  if (Number.isFinite(parsedDisplayId)) {
+    return parsedDisplayId
+  }
+  return undefined
+}
+
+function getDisplayDescription(item: Gw2UnlockDetailItem): string | undefined {
+  return withPlaceFallback(item, secondPlaceFinisher.value).description
+}
+function getDisplayImageUrl(item: Gw2UnlockDetailItem): string | undefined {
+  return withPlaceFallback(item, secondPlaceFinisher.value).iconUrl
 }
 </script>
 
@@ -129,21 +148,23 @@ function getFields(item: Gw2UnlockDetailItem) {
         <h3 class="finisher-group-heading">{{ group.label }}</h3>
 
         <div class="unlocks-grid">
-          <UnlockTile
+          <ItemTile
             v-for="item in group.items"
             :key="item.id"
             :name="item.name"
-            :image-url="item.iconUrl"
-            :owned="false"
+            :image-url="getDisplayImageUrl(item)"
+            :owned="item.owned ?? false"
           >
             <template #hover>
               <HoverCard
                 :title="item.name"
-                :description="item.description"
+                :description="getDisplayDescription(item)"
                 :fields="getFields(item)"
+                api-endpoint-path="items"
+                :api-endpoint-id="getPrimaryUnlockItemId(item)"
               />
             </template>
-          </UnlockTile>
+          </ItemTile>
         </div>
       </section>
     </div>

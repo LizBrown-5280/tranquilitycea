@@ -146,6 +146,7 @@ describe('GW2 endpoint manifest', () => {
         'mount_skin_details',
         'dye_catalog_ids',
         'dye_catalog_details',
+        'dye_item_details',
         'mail_carrier_ids',
         'mail_carrier_details',
         'finisher_ids',
@@ -197,7 +198,7 @@ describe('GW2 endpoint manifest', () => {
       ].includes(endpoint.id),
     )
 
-    expect(publicUnlockEndpoints.length).toBe(34)
+    expect(publicUnlockEndpoints.length).toBe(35)
     expect(accountUnlockEndpoints.length).toBe(16)
 
     for (const endpoint of publicUnlockEndpoints) {
@@ -208,6 +209,21 @@ describe('GW2 endpoint manifest', () => {
       expect(endpoint.section).toBe(sectionName)
       expect(endpoint.requiredScopes).toEqual(['unlocks'])
     }
+  })
+
+  it('loads dye item details from dye catalog item references', () => {
+    const dyeItemDetails = PUBLIC_ENDPOINTS.find((endpoint) => endpoint.id === 'dye_item_details')
+
+    expect(dyeItemDetails?.mode).toBe('csvFrom')
+    if (dyeItemDetails?.mode !== 'csvFrom') {
+      return
+    }
+
+    expect(dyeItemDetails.dependsOn).toBe('dye_catalog_details')
+    expect(dyeItemDetails.csvParam).toBe('ids')
+    expect(
+      dyeItemDetails.extractIds([[{ item: 5 }, { item: 5 }, { item: 9 }, { item: 'x' }]]),
+    ).toEqual([5, 9])
   })
 
   it('loads materials catalog and item details with csvFrom chain', () => {
@@ -281,12 +297,15 @@ describe('GW2 endpoint manifest', () => {
         'currency_metadata',
         'mount_skin_ids',
         'mount_skin_details',
+        'mount_types',
         'dye_catalog_ids',
         'dye_catalog_details',
+        'dye_item_details',
         'finisher_ids',
         'finisher_details',
         'finisher_unlock_item_details',
         'finisher_unlock_related_item_details',
+        'finisher_item_details',
       ]),
     )
     expect(new Set(accountEndpoints.map((endpoint) => endpoint.id))).toEqual(
@@ -310,14 +329,17 @@ describe('GW2 endpoint manifest', () => {
         'mini_catalog_details',
         'mount_skin_ids',
         'mount_skin_details',
+        'mount_types',
         'dye_catalog_ids',
         'dye_catalog_details',
+        'dye_item_details',
         'mail_carrier_ids',
         'mail_carrier_details',
         'finisher_ids',
         'finisher_details',
         'finisher_unlock_item_details',
         'finisher_unlock_related_item_details',
+        'finisher_item_details',
         'glider_ids',
         'glider_details',
         'novelty_ids',

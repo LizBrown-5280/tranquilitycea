@@ -23,10 +23,12 @@ const ENDPOINT_PROFILE_ALLOWLIST: Record<
       'mount_types',
       'dye_catalog_ids',
       'dye_catalog_details',
+      'dye_item_details',
       'mail_carrier_ids',
       'mail_carrier_details',
       'finisher_ids',
       'finisher_details',
+      'finisher_item_details',
       'finisher_unlock_item_details',
       'finisher_unlock_related_item_details',
       'glider_ids',
@@ -103,8 +105,10 @@ const ENDPOINT_PROFILE_ALLOWLIST: Record<
       'mount_skin_details',
       'dye_catalog_ids',
       'dye_catalog_details',
+      'dye_item_details',
       'finisher_ids',
       'finisher_details',
+      'finisher_item_details',
       'finisher_unlock_item_details',
       'finisher_unlock_related_item_details',
     ],
@@ -125,10 +129,12 @@ const ENDPOINT_PROFILE_ALLOWLIST: Record<
       'mount_skin_details',
       'dye_catalog_ids',
       'dye_catalog_details',
+      'dye_item_details',
       'mail_carrier_ids',
       'mail_carrier_details',
       'finisher_ids',
       'finisher_details',
+      'finisher_item_details',
       'finisher_unlock_item_details',
       'finisher_unlock_related_item_details',
       'glider_ids',
@@ -318,6 +324,39 @@ const PUBLIC_ENDPOINTS: Gw2EndpointDefinition[] = [
     },
   },
   {
+    id: 'dye_item_details',
+    description: 'Item details for dye unlock item references',
+    scope: 'public',
+    section: 'Account Unlocks',
+    mode: 'csvFrom',
+    path: '/v2/items',
+    dependsOn: 'dye_catalog_details',
+    csvParam: 'ids',
+    chunkSize: 100,
+    extractIds: (dependencyPayload) => {
+      const ids = new Set<number>()
+
+      for (const payloadEntry of dependencyPayload) {
+        if (!Array.isArray(payloadEntry)) {
+          continue
+        }
+
+        for (const colorEntry of payloadEntry) {
+          if (typeof colorEntry !== 'object' || colorEntry === null) {
+            continue
+          }
+
+          const itemId = (colorEntry as Record<string, unknown>).item
+          if (typeof itemId === 'number') {
+            ids.add(itemId)
+          }
+        }
+      }
+
+      return Array.from(ids)
+    },
+  },
+  {
     id: 'mail_carrier_ids',
     description: 'Mail carrier ids available in the game',
     scope: 'public',
@@ -422,6 +461,24 @@ const PUBLIC_ENDPOINTS: Gw2EndpointDefinition[] = [
     chunkSize: 100,
     maxGraphDepth: 4,
     extractIds: extractIdsFromItemRelations,
+  },
+  {
+    id: 'finisher_item_details',
+    description: 'Item details for finishers (for binding flags)',
+    scope: 'public',
+    section: 'Account Unlocks',
+    mode: 'csvFrom',
+    path: '/v2/items',
+    dependsOn: 'finisher_ids',
+    csvParam: 'ids',
+    chunkSize: 100,
+    extractIds: (dependencyPayload) => {
+      const firstPayload = dependencyPayload[0]
+      if (!Array.isArray(firstPayload)) {
+        return []
+      }
+      return firstPayload.filter((id): id is number => typeof id === 'number')
+    },
   },
   {
     id: 'glider_ids',

@@ -2,10 +2,10 @@
 import { computed } from 'vue'
 
 import HoverCard from '@/components/gw2/base/HoverCard.vue'
-import UnlockTile from '@/components/gw2/base/itemCard.vue'
+import ItemTile from '@/components/gw2/base/itemCard.vue'
 import UnlockPlanningGrid from '@/components/gw2/unlocks/UnlockPlanningGrid.vue'
 import { useGw2BootstrapStore } from '@/stores/gw2Bootstrap'
-import type { Gw2MountSkin, Gw2MountType } from '@/types/gw2'
+import type { Gw2MountSkin } from '@/types/gw2'
 
 const gw2 = useGw2BootstrapStore()
 
@@ -22,21 +22,9 @@ const summary = computed(() => {
   }
 })
 
-// Format dye slots for hover card
-function formatDyeSlots(skin: Gw2MountSkin): string {
-  if (!skin.dyeSlots || skin.dyeSlots.length === 0) {
-    return 'No dye slots'
-  }
-
-  return skin.dyeSlots
-    .map((slot) => `Slot ${slot.id}: ${slot.colorName || `Color #${slot.colorId}`}`)
-    .join(', ')
-}
-
-// Build hover card description with dye info
+// No hover card description for mounts (removes dye slot info)
 function getHoverDescription(skin: Gw2MountSkin): string {
-  const dyeInfo = formatDyeSlots(skin)
-  return `Status: ${skin.owned ? 'Owned' : 'Not owned'} • ${dyeInfo}`
+  return ''
 }
 </script>
 
@@ -44,7 +32,7 @@ function getHoverDescription(skin: Gw2MountSkin): string {
   <section class="unlocks-page">
     <header class="unlocks-page__header">
       <h2>Mounts</h2>
-      <p>Mount skins organized by type with dye slot information.</p>
+      <p>Mount skins organized by type.</p>
     </header>
 
     <div class="unlocks-summary">
@@ -64,17 +52,23 @@ function getHoverDescription(skin: Gw2MountSkin): string {
         <h3 class="mount-type-heading">{{ mountType.name }}</h3>
 
         <div class="unlocks-grid">
-          <UnlockTile
-            v-for="skin in mountType.skins"
+          <ItemTile
+            v-for="skin in [...mountType.skins].sort((a, b) => a.name.localeCompare(b.name))"
             :key="`${mountType.id}-${skin.id}`"
             :name="skin.name"
             :image-url="skin.icon"
             :owned="skin.owned ?? false"
           >
             <template #hover>
-              <HoverCard :title="skin.name" :description="getHoverDescription(skin)" :fields="[]" />
+              <HoverCard
+                :title="skin.name"
+                :description="getHoverDescription(skin)"
+                :fields="[]"
+                api-endpoint-path="mounts/skins"
+                :api-endpoint-id="skin.id"
+              />
             </template>
-          </UnlockTile>
+          </ItemTile>
         </div>
       </section>
     </div>

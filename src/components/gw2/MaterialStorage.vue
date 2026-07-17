@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 import HoverCard from '@/components/gw2/base/HoverCard.vue'
-import UnlockTile from '@/components/gw2/base/itemCard.vue'
+import ItemTile from '@/components/gw2/base/itemCard.vue'
 import type { UnlockDetailField } from '@/services/gw2/unlockCategoryViewModel'
 import { useGw2BootstrapStore } from '@/stores/gw2Bootstrap'
 
@@ -73,7 +73,7 @@ function getMaterialFields(item: (typeof materialItems.value)[number]): UnlockDe
     </p>
 
     <div v-else class="storage-grid">
-      <UnlockTile
+      <ItemTile
         v-for="item in materialItems"
         :key="`material-${item.id}`"
         :name="item.name"
@@ -86,9 +86,11 @@ function getMaterialFields(item: (typeof materialItems.value)[number]): UnlockDe
             :title="item.name"
             :description="item.description"
             :fields="getMaterialFields(item)"
+            api-endpoint-path="items"
+            :api-endpoint-id="item.id"
           />
         </template>
-      </UnlockTile>
+      </ItemTile>
     </div>
   </section>
 </template>

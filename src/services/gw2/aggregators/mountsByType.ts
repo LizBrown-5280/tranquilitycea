@@ -62,25 +62,10 @@ function buildSkinDetailsMap(
       continue
     }
 
-    const dyeSlots: Gw2MountDyeSlot[] = []
-
-    if (Array.isArray(skin.dye_slots)) {
-      for (const dyeId of skin.dye_slots) {
-        if (typeof dyeId === 'number') {
-          dyeSlots.push({
-            id: dyeId,
-            colorId: dyeId,
-            colorName: dyeColorMap.get(dyeId),
-          })
-        }
-      }
-    }
-
     skinMap.set(skin.id, {
       id: skin.id,
       name: skin.name,
       icon: typeof skin.icon === 'string' ? skin.icon : undefined,
-      dyeSlots: dyeSlots.length > 0 ? dyeSlots : undefined,
       owned: ownedSkinIds.has(skin.id),
     })
   }

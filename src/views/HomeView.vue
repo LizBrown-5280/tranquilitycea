@@ -7,7 +7,7 @@
     </header>
 
     <section class="game-grid" aria-label="Game guide list">
-      <article v-if="isDev" class="game-card available">
+      <article v-if="isGw2PreviewEnabled" class="game-card available">
         <div class="card-meta">
           <span class="status status-live">Live</span>
           <span class="card-domain">Game Data</span>
@@ -37,7 +37,7 @@
         <RouterLink class="card-link" to="/canasta">Open Canasta Tracker</RouterLink>
       </article>
 
-      <article v-if="isDev" class="game-card upcoming" aria-disabled="true">
+      <article v-if="isGw2PreviewEnabled" class="game-card upcoming" aria-disabled="true">
         <div class="card-meta">
           <span class="status status-queued">Queued</span>
           <span class="card-domain">Planning</span>
@@ -52,8 +52,9 @@
 
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { usePreviewFeatures } from '@/composables/usePreviewFeatures'
 
-const isDev = import.meta.env.DEV
+const { isGw2PreviewEnabled } = usePreviewFeatures()
 </script>
 
 <style scoped>

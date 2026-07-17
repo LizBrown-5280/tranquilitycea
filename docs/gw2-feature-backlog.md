@@ -168,16 +168,43 @@ Copy and fill this format when adding an item:
   - No layout shift when spinners appear/disappear.
 - `notes`: Consider whether sidebar should be collapsible on mobile. Finalize style direction (e.g., icon-only vs. text + icon) in design pass.
 
+- `id`: G-012
+- `title`: Owned vs. total counts for unlock categories and collections
+- `status`: idea
+- `summary`: Several unlock categories (Finishers, Mounts, Colors, etc.) already compute owned counts in some places, but counts are not consistently surfaced across all collection views. Add owned/total count badges or indicators wherever a user owns a subset of a fixed pool — e.g. "42 / 115 Finishers", "8 / 10 Mounts". Extend this to other enumerable collections (bank slots used, wallet non-zero currencies, etc.) where a denominator is knowable.
+- `user-value`: Players get an at-a-glance completion picture for each collection without drilling in.
+- `acceptance-criteria`:
+  - Each unlock category section shows an owned/total count (e.g. "X / Y").
+  - Count appears on both the category overview card and within the section header.
+  - Total denominator is sourced from the static manifest or API total where available.
+  - No count is shown when the denominator is unknown (graceful omission, not a broken fraction).
+  - Unit tests cover count derivation for at least one category.
+- `notes`: Finishers and Colors may already have partial count data — check aggregator outputs first before adding new endpoint calls. Mounts have a known fixed pool.
+
+- `id`: G-013
+- `title`: Revisit and refine HoverCard layout
+- `status`: deferred
+- `summary`: The current HoverCard layout was designed with the data available at the time. As more item-contract fields become populated (type, rarity, level requirements, description, details, etc.), the layout will need a rearrangement pass to handle density, hierarchy, and visual balance. Deferring until more fields are consistently populated so the layout decision is informed by real data.
+- `user-value`: Hover cards feel polished and readable once they carry richer content.
+- `acceptance-criteria`:
+  - HoverCard layout is reviewed and updated once key item-contract fields (rarity, level, description, details block) are reliably populated.
+  - Typography hierarchy is clear: name > type/rarity > stats/details > description.
+  - Layout handles missing optional fields gracefully without leaving blank gaps.
+  - Visual design is consistent with overall GW2 section aesthetic.
+- `notes`: Do not start this until at least rarity, level, and one details variant are consistently rendering. Check HoverCard.vue and itemCard.vue for current field coverage before layout work begins.
+
 ## Prioritization Queue
 
 1. G-001 Surface account overview fields
 2. G-003 Move AccountUnlockDisplayRow type into types/gw2.ts
 3. G-010 Remove progressionPublicQuery from loadLandingPublic(), start with wallet
 4. G-004 Wallet locked/no-key empty state
-5. G-002 Mastery points display rows
-6. G-005 Extract metric helper logic from view
-7. G-007 fatalError lifecycle state handling
-8. G-011 Loading spinners and left sidebar menu styling refinement
-9. G-006 Loading skeleton during public phase
-10. G-008 Achievement sample display rows
-11. G-009 Paginated / "show more" for capped display lists
+5. G-012 Owned vs. total counts for unlock categories and collections
+6. G-002 Mastery points display rows
+7. G-005 Extract metric helper logic from view
+8. G-007 fatalError lifecycle state handling
+9. G-011 Loading spinners and left sidebar menu styling refinement
+10. G-013 Revisit and refine HoverCard layout (deferred — waiting on field coverage)
+11. G-006 Loading skeleton during public phase
+12. G-008 Achievement sample display rows
+13. G-009 Paginated / "show more" for capped display lists

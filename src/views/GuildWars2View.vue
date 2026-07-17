@@ -95,15 +95,18 @@ onMounted(() => {
   <main class="gw2-page">
     <header class="gw2-header">
       <div class="gw2-title-row">
-        <h1>Guild Wars 2</h1>
-        <RouterLink
-          class="key-pill"
-          :class="{ 'key-pill--active': isKeysRoute }"
-          to="/guildwars2/keys"
-        >
-          <span>Keys</span>
-          <strong v-if="keySuffix">••••{{ keySuffix }}</strong>
-        </RouterLink>
+        <h1>Guild Wars 2 - Fan Site</h1>
+        <div class="gw2-title-actions">
+          <RouterLink class="dev-link" to="/guildwars2-dev">Dev</RouterLink>
+          <RouterLink
+            class="key-pill"
+            :class="{ 'key-pill--active': isKeysRoute }"
+            to="/guildwars2/keys"
+          >
+            <span>Keys</span>
+            <strong v-if="keySuffix">••••{{ keySuffix }}</strong>
+          </RouterLink>
+        </div>
       </div>
 
       <nav class="gw2-tabs" aria-label="GW2 sections">
@@ -176,6 +179,30 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
+}
+
+.gw2-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.dev-link {
+  text-decoration: none;
+  color: #17455a;
+  border: 1px solid #17455a;
+  border-radius: 999px;
+  padding: 0.32rem 0.8rem;
+  background: #fff;
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.dev-link:hover {
+  background-color: #f0f0f0;
 }
 
 .key-pill {

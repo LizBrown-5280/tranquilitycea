@@ -38,14 +38,19 @@ function formatValue(value: unknown): string {
 export function buildUnlockDetailFields(
   item: Gw2UnlockDetailItem,
   categorySpecificFields?: Array<{ key: string; label: string }>,
-  options?: { includeDescription?: boolean; maxRelatedPerSection?: number },
+  options?: {
+    includeDescription?: boolean
+    maxRelatedPerSection?: number
+    includeVendorValueAsCoin?: boolean
+  },
 ): UnlockDetailField[] {
   const fields: UnlockDetailField[] = []
   const maxRelated = options?.maxRelatedPerSection ?? 5
+  const includeVendorValueAsCoin = options?.includeVendorValueAsCoin ?? false
 
   // Add description if present
   if ((options?.includeDescription ?? true) && item.description) {
-    fields.push({ label: 'Description', value: item.description })
+    fields.push({ label: 'Info', value: item.description })
   }
 
   // Add common item fields
@@ -59,6 +64,18 @@ export function buildUnlockDetailFields(
 
   if (item.level !== undefined) {
     fields.push({ label: 'Level', value: String(item.level) })
+  }
+
+  if (includeVendorValueAsCoin && item.vendorValue !== undefined) {
+    fields.push({
+      label: 'Vendor Value',
+      value: String(item.vendorValue),
+      coinValueInCopper: item.vendorValue,
+    })
+  }
+
+  if (item.accountRaw) {
+    fields.push({ label: 'Account Bound', value: 'Account bound', emphasis: true })
   }
 
   // Add related items as structured sections
@@ -90,6 +107,14 @@ export function buildUnlockDetailFields(
           fields.push({
             label: 'Rarity',
             value: related.rarity,
+          })
+        }
+
+        if (includeVendorValueAsCoin && related.vendorValue !== undefined) {
+          fields.push({
+            label: 'Vendor Value',
+            value: String(related.vendorValue),
+            coinValueInCopper: related.vendorValue,
           })
         }
       }

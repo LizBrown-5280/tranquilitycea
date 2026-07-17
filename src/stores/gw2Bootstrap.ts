@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 
 import { aggregateAllSections, createInitialSections } from '@/services/gw2/aggregators'
 import { flattenPayloadEntries, getSectionResults } from '@/services/gw2/aggregators/helpers'
+import { buildColorDetailsWithRelations } from '@/services/gw2/aggregators/colorDetails'
 import { buildFinisherDetailsWithRelations } from '@/services/gw2/aggregators/finisherDetails'
 import { buildMountDetailsWithRelations } from '@/services/gw2/aggregators/mountDetails'
 import { buildMountsByType } from '@/services/gw2/aggregators/mountsByType'
@@ -324,6 +325,8 @@ export const useGw2BootstrapStore = defineStore('gw2Bootstrap', () => {
 
   const finisherDetails = computed(() => buildFinisherDetailsWithRelations(allResults.value))
 
+  const colorDetails = computed(() => buildColorDetailsWithRelations(allResults.value))
+
   const mountDetails = computed(() => buildMountDetailsWithRelations(allResults.value))
 
   const mountsByType = computed(() => buildMountsByType(allResults.value))
@@ -358,6 +361,7 @@ export const useGw2BootstrapStore = defineStore('gw2Bootstrap', () => {
     itemDetailsById,
     bankItems,
     materialItems,
+    colorDetails,
     finisherDetails,
     mountDetails,
     mountsByType,

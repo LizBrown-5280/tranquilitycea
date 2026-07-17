@@ -10,7 +10,10 @@ interface ItemDetailsCache {
   byId: Map<string | number, Gw2UnlockDetailItem>
 }
 
-function normalizeItemBasics(entry: Record<string, unknown>): Gw2UnlockDetailItem {
+function normalizeItemBasics(
+  entry: Record<string, unknown>,
+  accountRaw?: Record<string, unknown>,
+): Gw2UnlockDetailItem {
   const id = entry.id
   const name = typeof entry.name === 'string' ? sanitizeGw2Text(entry.name) : `Item ${id}`
   const description =
@@ -22,16 +25,19 @@ function normalizeItemBasics(entry: Record<string, unknown>): Gw2UnlockDetailIte
   const type = typeof entry.type === 'string' ? entry.type : undefined
   const rarity = typeof entry.rarity === 'string' ? entry.rarity : undefined
   const level = typeof entry.level === 'number' ? entry.level : undefined
+  const vendorValue = typeof entry.vendor_value === 'number' ? entry.vendor_value : undefined
 
   return {
     id,
     name,
     description,
     iconUrl,
+    vendorValue,
     type,
     rarity,
     level,
     raw: entry,
+    accountRaw,
   }
 }
 
@@ -70,8 +76,9 @@ export function buildUnlockDetailItem(
     sourceField: string
     itemsCache: ItemDetailsCache
   }>,
+  accountRaw?: Record<string, unknown>,
 ): Gw2UnlockDetailItem {
-  const item = normalizeItemBasics(catalogEntry)
+  const item = normalizeItemBasics(catalogEntry, accountRaw)
 
   if (!relationConfigs || relationConfigs.length === 0) {
     return item
