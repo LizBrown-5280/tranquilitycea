@@ -6,23 +6,26 @@ const enabledFeatures = ref<Set<string>>(new Set())
 
 export function usePreviewFeatures() {
   onMounted(() => {
-    // Check for query parameter
+    enabledFeatures.value.clear()
+
+    // Use URL query parameter only (no persisted preview state).
     const params = new URLSearchParams(window.location.search)
     const previewParam = params.get('preview')
 
-    if (previewParam) {
-      const features = previewParam.split(',').map((f) => f.trim())
-      features.forEach((feature) => enabledFeatures.value.add(feature))
-
-      // Persist to localStorage
-      localStorage.setItem(PREVIEW_STORAGE_KEY, Array.from(enabledFeatures.value).join(','))
-    } else {
-      // Load from localStorage if no query param
-      const stored = localStorage.getItem(PREVIEW_STORAGE_KEY)
-      if (stored) {
-        stored.split(',').forEach((feature) => enabledFeatures.value.add(feature))
-      }
+    if (!previewParam) {
+      localStorage.removeItem(PREVIEW_STORAGE_KEY)
+      return
     }
+
+    const features = previewParam
+      .split(',')
+      .map((feature) => feature.trim().toLowerCase())
+      .filter((feature) => feature.length > 0)
+
+    features.forEach((feature) => enabledFeatures.value.add(feature))
+
+    // Remove stale persisted preview flags from older behavior.
+    localStorage.removeItem(PREVIEW_STORAGE_KEY)
   })
 
   const isFeatureEnabled = (feature: string) => {
@@ -34,16 +37,40 @@ export function usePreviewFeatures() {
 
   const clearPreview = () => {
     enabledFeatures.value.clear()
+    const params = new URLSearchParams(window.location.search)
+    params.delete('preview')
+
+    const nextQuery = params.toString()
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`
+    window.history.replaceState({}, '', nextUrl)
+
     localStorage.removeItem(PREVIEW_STORAGE_KEY)
   }
 
   const toggleFeature = (feature: string) => {
-    if (enabledFeatures.value.has(feature)) {
-      enabledFeatures.value.delete(feature)
-    } else {
-      enabledFeatures.value.add(feature)
+    const normalizedFeature = feature.trim().toLowerCase()
+    if (!normalizedFeature) {
+      return
     }
-    localStorage.setItem(PREVIEW_STORAGE_KEY, Array.from(enabledFeatures.value).join(','))
+
+    if (enabledFeatures.value.has(normalizedFeature)) {
+      enabledFeatures.value.delete(normalizedFeature)
+    } else {
+      enabledFeatures.value.add(normalizedFeature)
+    }
+
+    const params = new URLSearchParams(window.location.search)
+    if (enabledFeatures.value.size > 0) {
+      params.set('preview', Array.from(enabledFeatures.value).join(','))
+    } else {
+      params.delete('preview')
+    }
+
+    const nextQuery = params.toString()
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`
+    window.history.replaceState({}, '', nextUrl)
+
+    localStorage.removeItem(PREVIEW_STORAGE_KEY)
   }
 
   return {
