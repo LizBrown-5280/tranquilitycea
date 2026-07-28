@@ -37,7 +37,22 @@
         <RouterLink class="card-link" to="/canasta">Open Canasta Tracker</RouterLink>
       </article>
 
-      <article v-if="isGw2PreviewEnabled" class="game-card upcoming" aria-disabled="true">
+      <article class="game-card available">
+        <div class="card-meta">
+          <span class="status status-live">Live</span>
+          <span class="card-domain">Scoring Tool</span>
+        </div>
+        <h2>Swipe Score Tracker</h2>
+        <p>Track up to 12 rounds of Swipe and keep team scores organized in one place.</p>
+        <ul class="tag-list" aria-label="Swipe tracker technologies">
+          <li>Vue 3</li>
+          <li>TypeScript</li>
+          <li>Responsive UI</li>
+        </ul>
+        <RouterLink class="card-link" to="/swipe">Open Swipe Tracker</RouterLink>
+      </article>
+
+      <article v-if="isPoE2PreviewEnabled" class="game-card upcoming" aria-disabled="true">
         <div class="card-meta">
           <span class="status status-queued">Queued</span>
           <span class="card-domain">Planning</span>
@@ -54,7 +69,7 @@
 import { RouterLink } from 'vue-router'
 import { usePreviewFeatures } from '@/composables/usePreviewFeatures'
 
-const { isGw2PreviewEnabled } = usePreviewFeatures()
+const { isGw2PreviewEnabled, isPoE2PreviewEnabled } = usePreviewFeatures()
 </script>
 
 <style scoped>

@@ -21,6 +21,7 @@
 
 body {
   min-height: 100vh;
+  min-height: 100dvh;
   color: var(--ui-text);
   background:
     radial-gradient(circle at top right, #fff6d6 0%, rgba(255, 246, 214, 0) 38%),

@@ -25,7 +25,12 @@ export function usePreviewFeatures() {
     }
   })
 
-  const isGw2PreviewEnabled = computed(() => enabledFeatures.value.has('gw2'))
+  const isFeatureEnabled = (feature: string) => {
+    return enabledFeatures.value.has(feature)
+  }
+
+  const isGw2PreviewEnabled = computed(() => isFeatureEnabled('gw2'))
+  const isPoE2PreviewEnabled = computed(() => isFeatureEnabled('poe2'))
 
   const clearPreview = () => {
     enabledFeatures.value.clear()
@@ -43,6 +48,8 @@ export function usePreviewFeatures() {
 
   return {
     isGw2PreviewEnabled,
+    isPoE2PreviewEnabled,
+    isFeatureEnabled,
     clearPreview,
     toggleFeature,
   }

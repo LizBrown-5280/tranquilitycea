@@ -79,6 +79,11 @@ const router = createRouter({
       name: 'canasta',
       component: () => import('../views/CanastaView.vue'),
     },
+    {
+      path: '/swipe',
+      name: 'swipe',
+      component: () => import('../views/SwipeView.vue'),
+    },
   ],
 })
 
