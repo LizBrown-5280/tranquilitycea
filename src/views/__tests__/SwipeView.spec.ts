@@ -217,6 +217,35 @@ describe('SwipeView', () => {
     expect((nextRoundButton.element as HTMLButtonElement).disabled).toBe(false)
   })
 
+  it('enables next round as soon as typing begins in the last missing score input', async () => {
+    const wrapper = mount(SwipeView)
+    await wrapper.find('[data-test="new-session-button"]').trigger('click')
+
+    const playerInputs = wrapper.findAll('[data-test^="swipe-player-name-"]')
+    for (const [index, input] of playerInputs.entries()) {
+      await input.setValue(`Player ${index + 1}`)
+    }
+
+    await wrapper.find('[data-test="swipe-start-tracker-button"]').trigger('click')
+
+    const nextRoundButton = wrapper.find('[data-test="swipe-next-round-button"]')
+    expect((nextRoundButton.element as HTMLButtonElement).disabled).toBe(true)
+
+    const firstScoreInput = wrapper.find('[data-test="swipe-score-input-r1-p1"]')
+    await firstScoreInput.setValue('10')
+    await firstScoreInput.trigger('change')
+
+    const secondScoreInput = wrapper.find('[data-test="swipe-score-input-r1-p2"]')
+    await secondScoreInput.setValue('20')
+    await secondScoreInput.trigger('change')
+
+    const lastScoreInput = wrapper.find('[data-test="swipe-score-input-r1-p3"]')
+    await lastScoreInput.setValue('1')
+    await lastScoreInput.trigger('input')
+
+    expect((nextRoundButton.element as HTMLButtonElement).disabled).toBe(false)
+  })
+
   it('advances to next round and rotates the starting player', async () => {
     const wrapper = mount(SwipeView)
     await wrapper.find('[data-test="new-session-button"]').trigger('click')
@@ -246,43 +275,23 @@ describe('SwipeView', () => {
     expect(rowsAfter[1].classes()).toContain('score-grid-row--starting')
   })
 
-  it('applies winner chip quick-fill with 0 in default mode', async () => {
-    const wrapper = mount(SwipeView)
-    await wrapper.find('[data-test="new-session-button"]').trigger('click')
+  it('hides the winner quick-fill bar once the game is locked after ending early', async () => {
+    const wrapper = await enterTrackerWithNamedPlayers()
 
-    const playerInputs = wrapper.findAll('[data-test^="swipe-player-name-"]')
-    for (const [index, input] of playerInputs.entries()) {
-      await input.setValue(`Player ${index + 1}`)
+    const roundOneScores = [10, 20, 30]
+    for (let playerIndex = 1; playerIndex <= roundOneScores.length; playerIndex += 1) {
+      const scoreInput = wrapper.find(`[data-test="swipe-score-input-r1-p${playerIndex}"]`)
+      await scoreInput.setValue(String(roundOneScores[playerIndex - 1]))
+      await scoreInput.trigger('change')
     }
 
-    await wrapper.find('[data-test="swipe-start-tracker-button"]').trigger('click')
+    await wrapper.find('[data-test="swipe-end-game-button"]').trigger('click')
 
-    const winnerChip = wrapper.find('[data-test="swipe-winner-chip-p1"]')
-    await winnerChip.trigger('click')
+    expect(wrapper.find('[data-test="swipe-winner-chip-bar"]').exists()).toBe(false)
 
-    const scoreInput = wrapper.find('[data-test="swipe-score-input-r1-p1"]')
-    expect((scoreInput.element as HTMLInputElement).value).toBe('0')
-  })
+    await wrapper.find('[data-test="swipe-continue-game-button"]').trigger('click')
 
-  it('applies winner chip quick-fill with -10 in minusTen mode', async () => {
-    const wrapper = mount(SwipeView)
-    await wrapper.find('[data-test="new-session-button"]').trigger('click')
-
-    const minusTen = wrapper.find('[data-test="swipe-winner-mode-minus-ten"]')
-    await minusTen.setValue(true)
-
-    const playerInputs = wrapper.findAll('[data-test^="swipe-player-name-"]')
-    for (const [index, input] of playerInputs.entries()) {
-      await input.setValue(`Player ${index + 1}`)
-    }
-
-    await wrapper.find('[data-test="swipe-start-tracker-button"]').trigger('click')
-
-    const winnerChip = wrapper.find('[data-test="swipe-winner-chip-p2"]')
-    await winnerChip.trigger('click')
-
-    const scoreInput = wrapper.find('[data-test="swipe-score-input-r1-p2"]')
-    expect((scoreInput.element as HTMLInputElement).value).toBe('-10')
+    expect(wrapper.find('[data-test="swipe-winner-chip-bar"]').exists()).toBe(true)
   })
 
   it('does not show round-in-progress text in the status area by default', async () => {
@@ -306,7 +315,7 @@ describe('SwipeView', () => {
     expect((endGameButton.element as HTMLButtonElement).disabled).toBe(false)
     await endGameButton.trigger('click')
 
-    expect(wrapper.find('[data-test="swipe-round-badge"]').text()).toContain('Round 12 / 12')
+    expect(wrapper.find('[data-test="swipe-round-badge"]').text()).toContain('Round 1 / 12')
     expect(wrapper.find('[data-test="swipe-round-status"]').text()).toContain('Game complete')
     expect(wrapper.find('[data-test="swipe-next-round-button"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="swipe-end-game-button"]').exists()).toBe(false)
@@ -332,25 +341,21 @@ describe('SwipeView', () => {
     ).toBe(false)
   })
 
-  it('clears the previous winner quick-fill selection when choosing a different player', async () => {
-    const wrapper = mount(SwipeView)
-    await wrapper.find('[data-test="new-session-button"]').trigger('click')
+  it('shows completed rounds in badge when ending early during an unscored round', async () => {
+    const wrapper = await enterTrackerWithNamedPlayers()
 
-    const playerInputs = wrapper.findAll('[data-test^="swipe-player-name-"]')
-    for (const [index, input] of playerInputs.entries()) {
-      await input.setValue(`Player ${index + 1}`)
+    const roundOneScores = [10, 20, 30]
+    for (let playerIndex = 1; playerIndex <= roundOneScores.length; playerIndex += 1) {
+      const scoreInput = wrapper.find(`[data-test="swipe-score-input-r1-p${playerIndex}"]`)
+      await scoreInput.setValue(String(roundOneScores[playerIndex - 1]))
+      await scoreInput.trigger('change')
     }
 
-    await wrapper.find('[data-test="swipe-start-tracker-button"]').trigger('click')
+    await wrapper.find('[data-test="swipe-next-round-button"]').trigger('click')
+    expect(wrapper.find('[data-test="swipe-round-badge"]').text()).toContain('Round 2 / 12')
 
-    await wrapper.find('[data-test="swipe-winner-chip-p1"]').trigger('click')
-    await wrapper.find('[data-test="swipe-winner-chip-p2"]').trigger('click')
-
-    const firstPlayerScore = wrapper.find('[data-test="swipe-score-input-r1-p1"]')
-    const secondPlayerScore = wrapper.find('[data-test="swipe-score-input-r1-p2"]')
-
-    expect((firstPlayerScore.element as HTMLInputElement).value).toBe('')
-    expect((secondPlayerScore.element as HTMLInputElement).value).toBe('0')
+    await wrapper.find('[data-test="swipe-end-game-button"]').trigger('click')
+    expect(wrapper.find('[data-test="swipe-round-badge"]').text()).toContain('Round 1 / 12')
   })
 
   it('shows game-complete winner summary for lowest total after round 12', async () => {

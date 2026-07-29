@@ -141,6 +141,28 @@ const isCurrentRoundComplete = computed(() => {
   return activeSession.value.players.every((player) => typeof roundScores[player.id] === 'number')
 })
 
+const completedRoundsCount = computed(() => {
+  if (!activeSession.value) {
+    return 0
+  }
+
+  let completedCount = 0
+  for (const round of roundNumbers) {
+    const roundScores = activeSession.value.scoresByRound[round] ?? {}
+    const isRoundComplete = activeSession.value.players.every(
+      (player) => typeof roundScores[player.id] === 'number',
+    )
+
+    if (!isRoundComplete) {
+      break
+    }
+
+    completedCount += 1
+  }
+
+  return completedCount
+})
+
 const canAdvanceRound = computed(() => {
   return (
     !!activeSession.value &&
@@ -164,14 +186,24 @@ const trackerStatusLabel = computed(() => {
     return 'Read-only archive'
   }
 
-  if (isFinalRound.value && isCurrentRoundComplete.value) {
+  if (isGameComplete.value) {
     return 'Game complete'
   }
 
   return isCurrentRoundComplete.value ? 'Round complete' : ''
 })
 
-const isGameComplete = computed(() => isFinalRound.value && isCurrentRoundComplete.value)
+const isGameComplete = computed(() => {
+  if (!activeSession.value) {
+    return false
+  }
+
+  if (activeSession.value.isGameLocked && endedEarlyRound.value !== null) {
+    return true
+  }
+
+  return isFinalRound.value && isCurrentRoundComplete.value
+})
 const isGameLocked = computed(() => activeSession.value?.isGameLocked ?? false)
 const endedEarlyRound = computed(() => activeSession.value?.endedEarlyRound ?? null)
 const isTrackerReadOnly = computed(() => isArchivedReadOnly.value || isGameLocked.value)
@@ -183,6 +215,14 @@ const canContinueGame = computed(() => {
     isGameLocked.value &&
     endedEarlyRound.value !== null
   )
+})
+
+const displayedRoundNumber = computed(() => {
+  if (isGameLocked.value && endedEarlyRound.value !== null) {
+    return completedRoundsCount.value
+  }
+
+  return activeRound.value
 })
 
 const winnerPlayerIds = computed(() => {
@@ -217,6 +257,14 @@ const winnerSummaryText = computed(() => {
   }
 
   return `Tie: ${winnerNames.join(' & ')} (${winningTotal})`
+})
+
+const shouldShowWinnerQuickFill = computed(() => {
+  if (!activeSession.value || isTrackerReadOnly.value || isGameComplete.value) {
+    return false
+  }
+
+  return endedEarlyRound.value === null
 })
 
 const winnerAutofillValue = computed(() => {
@@ -439,24 +487,9 @@ function endGameEarly() {
     return
   }
 
-  const finalRoundScores = {
-    ...activeSession.value.scoresByRound[SWIPE_TOTAL_ROUNDS],
-  }
-
-  for (const player of activeSession.value.players) {
-    if (typeof finalRoundScores[player.id] !== 'number') {
-      finalRoundScores[player.id] = 0
-    }
-  }
-
   const updatedSession: SwipeSessionEnvelope = {
     ...activeSession.value,
     endedEarlyRound: activeRound.value,
-    currentRound: SWIPE_TOTAL_ROUNDS,
-    scoresByRound: {
-      ...activeSession.value.scoresByRound,
-      [SWIPE_TOTAL_ROUNDS]: finalRoundScores,
-    },
     isGameLocked: true,
     updatedAt: Date.now(),
   }
@@ -813,25 +846,27 @@ function clearAllStoredSessions() {
 
           <div class="round-progress-controls" data-test="swipe-round-progress">
             <div class="round-badge" data-test="swipe-round-badge">
-              Round {{ activeRound }} / {{ SWIPE_TOTAL_ROUNDS }}
+              Round {{ displayedRoundNumber }} / {{ SWIPE_TOTAL_ROUNDS }}
+            </div>
+            <div v-if="trackerStatusLabel" class="round-status" data-test="swipe-round-status">
+              {{ trackerStatusLabel }}
             </div>
           </div>
 
-          <div class="winner-chip-bar" data-test="swipe-winner-chip-bar">
-            <p class="winner-chip-label">Winner quick fill ({{ winnerAutofillValue }})</p>
+          <div
+            v-if="shouldShowWinnerQuickFill"
+            class="winner-chip-bar"
+            data-test="swipe-winner-chip-bar"
+          >
+            <p class="winner-chip-label">Winner quick fill</p>
             <div class="winner-chip-list">
               <button
                 v-for="(player, index) in trackerPlayerPreview"
                 :key="`winner-chip-${player.id}`"
                 type="button"
                 class="winner-chip"
-                :class="{
-                  'winner-chip--active':
-                    getScoreInputValue(activeRound, player.id) === String(winnerAutofillValue),
-                }"
-                :data-test="`swipe-winner-chip-p${index + 1}`"
-                :title="`Set ${player.fullName} round ${activeRound} to ${winnerAutofillValue}`"
                 :disabled="isTrackerReadOnly"
+                :data-test="`swipe-winner-chip-p${index + 1}`"
                 @click="applyWinnerAutofill(player.id)"
               >
                 {{ player.shortName }}
@@ -845,10 +880,6 @@ function clearAllStoredSessions() {
             data-test="swipe-game-complete-summary"
           >
             <span>{{ winnerSummaryText }}</span>
-          </div>
-
-          <div v-if="trackerStatusLabel" class="round-status" data-test="swipe-round-status">
-            {{ trackerStatusLabel }}
           </div>
 
           <section class="score-grid-shell" data-test="swipe-score-grid">
@@ -904,6 +935,13 @@ function clearAllStoredSessions() {
                       :max="SWIPE_SCORE_MAX"
                       :value="getScoreInputValue(round, player.id)"
                       :disabled="isTrackerReadOnly"
+                      @input="
+                        updateRoundScore(
+                          round,
+                          player.id,
+                          ($event.target as HTMLInputElement).value,
+                        )
+                      "
                       @change="
                         updateRoundScore(
                           round,
@@ -1228,11 +1266,10 @@ h1 {
 }
 
 .round-status {
-  width: 100%;
   font-size: 0.78rem;
   color: #255a2a;
   font-weight: 700;
-  text-align: center;
+  line-height: 1;
 }
 
 .round-bottom-actions {
