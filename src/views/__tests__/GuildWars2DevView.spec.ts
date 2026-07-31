@@ -16,6 +16,10 @@ interface MockGw2Query {
   loading: ReturnType<typeof ref<boolean>>
 }
 
+function createWritableComputed<T>(getter: () => T) {
+  return computed(getter) as ReturnType<typeof computed<T>> & { value: T }
+}
+
 function createMockQuery(initialData: Gw2EndpointRunResult[] = []): MockGw2Query {
   const loading = ref(false)
   const data = shallowRef<Gw2EndpointRunResult[] | undefined>(initialData)
@@ -23,7 +27,7 @@ function createMockQuery(initialData: Gw2EndpointRunResult[] = []): MockGw2Query
   return {
     data,
     loading,
-    asyncStatus: computed(() => (loading.value ? 'loading' : 'idle')),
+    asyncStatus: createWritableComputed(() => (loading.value ? 'loading' : 'idle')),
     refresh: vi.fn(async () => ({ status: 'success', data: data.value, error: null })),
     refetch: vi.fn(async () => ({ status: 'success', data: data.value, error: null })),
   }

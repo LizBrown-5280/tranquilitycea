@@ -10,11 +10,15 @@ interface ItemDetailsCache {
   byId: Map<string | number, Gw2UnlockDetailItem>
 }
 
+function coerceItemId(value: unknown): string | number | undefined {
+  return typeof value === 'string' || typeof value === 'number' ? value : undefined
+}
+
 function normalizeItemBasics(
   entry: Record<string, unknown>,
   accountRaw?: Record<string, unknown>,
 ): Gw2UnlockDetailItem {
-  const id = entry.id
+  const id = coerceItemId(entry.id) ?? 0
   const name = typeof entry.name === 'string' ? sanitizeGw2Text(entry.name) : `Item ${id}`
   const description =
     typeof entry.description === 'string' ? sanitizeGw2Text(entry.description) : undefined
@@ -135,8 +139,8 @@ export function buildItemDetailsCache(entries: unknown[]): ItemDetailsCache {
     }
 
     const record = entry as Record<string, unknown>
-    const id = record.id
-    if (!id) {
+    const id = coerceItemId(record.id)
+    if (id === undefined) {
       continue
     }
 

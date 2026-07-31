@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { CanastaSessionEnvelope } from '@/types/canasta'
+import type { SwipeSessionEnvelope } from '@/types/swipe'
 import { formatSessionLabel } from '@/services/canasta/sessionHelpers'
 
+type SessionOption = CanastaSessionEnvelope | SwipeSessionEnvelope
+
 defineProps<{
-  currentSessionOption: CanastaSessionEnvelope | null
-  previousSessionOptions: CanastaSessionEnvelope[]
-  allStoredSessions: CanastaSessionEnvelope[]
+  currentSessionOption: SessionOption | null
+  previousSessionOptions: SessionOption[]
+  allStoredSessions: SessionOption[]
   retentionDays: number
   isTransitioning: boolean
 }>()

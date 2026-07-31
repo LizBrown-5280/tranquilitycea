@@ -36,21 +36,41 @@ describe('swipe model helpers', () => {
     const session = createEmptySwipeSessionEnvelope(2000)
     const expanded = updateSwipeSessionPlayers(session, SWIPE_MAX_PLAYERS)
 
-    expanded.scoresByRound[1][expanded.players[0].id] = 25
+    const firstPlayerId = expanded.players[0]?.id
+    if (!firstPlayerId) {
+      throw new Error('Expected a player to exist')
+    }
+
+    const roundOneScores = expanded.scoresByRound[1]
+    if (!roundOneScores) {
+      throw new Error('Expected round 1 scores to exist')
+    }
+
+    roundOneScores[firstPlayerId] = 25
 
     const shrunk = updateSwipeSessionPlayers(expanded, SWIPE_MIN_PLAYERS)
+    const shrunkPlayerId = shrunk.players[0]?.id
 
     expect(shrunk.players).toHaveLength(SWIPE_MIN_PLAYERS)
-    expect(shrunk.scoresByRound[1][shrunk.players[0].id]).toBe(25)
+    expect(shrunkPlayerId).toBeDefined()
+    const shrunkRoundOneScores = shrunk.scoresByRound[1]
+    if (!shrunkRoundOneScores || !shrunkPlayerId) {
+      throw new Error('Expected round 1 scores to exist')
+    }
+
+    expect(shrunkRoundOneScores[shrunkPlayerId]).toBe(25)
   })
 
   it('updates player names with trimming', () => {
     const session = createEmptySwipeSessionEnvelope(3000)
-    const playerId = session.players[0].id
+    const playerId = session.players[0]?.id
+    if (!playerId) {
+      throw new Error('Expected a player to exist')
+    }
 
     const updated = updateSwipePlayerName(session, playerId, '  Liz  ')
 
-    expect(updated.players[0].name).toBe('Liz')
+    expect(updated.players[0]?.name).toBe('Liz')
   })
 
   it('truncates long names with ellipsis for compact display', () => {

@@ -50,8 +50,13 @@ export function groupFinishers(items: Gw2UnlockDetailItem[]) {
   }))
 
   for (const item of items) {
-    const group = GROUPS.find((g) => g.matches && g.matches(item)) || GROUPS[GROUPS.length - 1]
-    grouped.find((g) => g.label === group.label)?.items.push(item)
+    const fallbackGroup = GROUPS[GROUPS.length - 1] ?? { label: 'Other', matches: undefined }
+    const matchedGroup = GROUPS.find((g) => g.matches && g.matches(item))
+    const targetLabel = matchedGroup?.label ?? fallbackGroup.label
+    const targetGroup = grouped.find((g) => g.label === targetLabel)
+    if (targetGroup) {
+      targetGroup.items.push(item)
+    }
   }
 
   return grouped.filter((g) => g.items.length > 0)

@@ -1,5 +1,9 @@
 import type { CanastaSessionEnvelope, CanastaTeamId, HandTabId } from '@/types/canasta'
 
+interface SessionLike {
+  sessionId: number
+}
+
 /** 4 hours in milliseconds. */
 const CURRENT_SESSION_WINDOW_MS = 4 * 60 * 60 * 1000
 
@@ -25,10 +29,10 @@ export function isPrevious(sessionId: number, now: number = Date.now()): boolean
  * Returns the latest session that is within the current 4-hour window.
  * Returns null if no current session exists.
  */
-export function getCurrentSession(
-  sessions: CanastaSessionEnvelope[],
+export function getCurrentSession<T extends SessionLike>(
+  sessions: T[],
   now: number = Date.now(),
-): CanastaSessionEnvelope | null {
+): T | null {
   const currentSessions = sessions.filter((s) => isCurrent(s.sessionId, now))
 
   if (currentSessions.length === 0) {
@@ -44,10 +48,10 @@ export function getCurrentSession(
 /**
  * Returns all sessions that are archived (4+ hours old), sorted newest first.
  */
-export function getPreviousSessions(
-  sessions: CanastaSessionEnvelope[],
+export function getPreviousSessions<T extends SessionLike>(
+  sessions: T[],
   now: number = Date.now(),
-): CanastaSessionEnvelope[] {
+): T[] {
   return sessions
     .filter((s) => isPrevious(s.sessionId, now))
     .sort((a, b) => b.sessionId - a.sessionId)
@@ -56,7 +60,7 @@ export function getPreviousSessions(
 /**
  * Sorts sessions by creation time, newest first.
  */
-export function sortSessionsByNewest(sessions: CanastaSessionEnvelope[]): CanastaSessionEnvelope[] {
+export function sortSessionsByNewest<T extends SessionLike>(sessions: T[]): T[] {
   return [...sessions].sort((a, b) => b.sessionId - a.sessionId)
 }
 
@@ -64,7 +68,7 @@ export function sortSessionsByNewest(sessions: CanastaSessionEnvelope[]): Canast
  * Formats a session as a human-readable label with date and time.
  * Example: "Mon, May 4 at 3:45 PM"
  */
-export function formatSessionLabel(session: CanastaSessionEnvelope): string {
+export function formatSessionLabel<T extends SessionLike>(session: T): string {
   const date = new Date(session.sessionId)
   const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
   const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })

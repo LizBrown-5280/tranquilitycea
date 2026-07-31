@@ -264,15 +264,15 @@ describe('SwipeView', () => {
     }
 
     const firstRowBefore = wrapper.findAll('.score-grid-row')[0]
-    expect(firstRowBefore.classes()).toContain('score-grid-row--starting')
+    expect(firstRowBefore?.classes()).toContain('score-grid-row--starting')
 
     await wrapper.find('[data-test="swipe-next-round-button"]').trigger('click')
 
     expect(wrapper.find('[data-test="swipe-round-badge"]').text()).toContain('Round 2 / 12')
 
     const rowsAfter = wrapper.findAll('.score-grid-row')
-    expect(rowsAfter[0].classes()).not.toContain('score-grid-row--starting')
-    expect(rowsAfter[1].classes()).toContain('score-grid-row--starting')
+    expect(rowsAfter[0]?.classes()).not.toContain('score-grid-row--starting')
+    expect(rowsAfter[1]?.classes()).toContain('score-grid-row--starting')
   })
 
   it('hides the winner quick-fill bar once the game is locked after ending early', async () => {

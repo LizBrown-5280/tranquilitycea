@@ -120,7 +120,7 @@ const runningTotalsByPlayer = computed(() => {
     for (const player of activeSession.value.players) {
       const value = roundScores[player.id]
       if (typeof value === 'number') {
-        totals[player.id] += value
+        totals[player.id] = (totals[player.id] ?? 0) + value
       }
     }
   }
@@ -250,7 +250,8 @@ const winnerSummaryText = computed(() => {
     .filter((player) => winnerPlayerIds.value.includes(player.id))
     .map((player) => player.fullName)
 
-  const winningTotal = runningTotalsByPlayer.value[winnerPlayerIds.value[0]] ?? 0
+  const leadingWinnerId = winnerPlayerIds.value[0]
+  const winningTotal = leadingWinnerId ? (runningTotalsByPlayer.value[leadingWinnerId] ?? 0) : 0
 
   if (winnerNames.length === 1) {
     return `Winner: ${winnerNames[0]} (${winningTotal})`

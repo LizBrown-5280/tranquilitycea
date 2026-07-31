@@ -11,7 +11,7 @@ describe('unlockDetailBuilder', () => {
   it('extracts numeric IDs from various field types', () => {
     expect(extractRelatedItemIds(123)).toEqual([123])
     expect(extractRelatedItemIds([1, 2, 3])).toEqual([1, 2, 3])
-    expect(extractRelatedItemIds([1, [2, 3])).toEqual([1, 2, 3])
+    expect(extractRelatedItemIds([1, [2, 3]])).toEqual([1, 2, 3])
     expect(extractRelatedItemIds(null)).toEqual([])
     expect(extractRelatedItemIds(undefined)).toEqual([])
   })
@@ -76,12 +76,13 @@ describe('unlockDetailBuilder', () => {
       },
     ])
 
+    const related = item.relatedItems?.[0]
     expect(item.relatedItems).toBeDefined()
     expect(item.relatedItems?.length).toBe(1)
-    expect(item.relatedItems?.[0].relationName).toBe('Unlock Items')
-    expect(item.relatedItems?.[0].items.length).toBe(2)
-    expect(item.relatedItems?.[0].items[0].name).toBe('Related Item 1')
-    expect(item.relatedItems?.[0].items[1].name).toBe('Related Item 2')
+    expect(related?.relationName).toBe('Unlock Items')
+    expect(related?.items.length).toBe(2)
+    expect(related?.items[0]?.name).toBe('Related Item 1')
+    expect(related?.items[1]?.name).toBe('Related Item 2')
   })
 
   it('handles multiple relation configs', () => {
@@ -105,10 +106,10 @@ describe('unlockDetailBuilder', () => {
     ])
 
     expect(item.relatedItems?.length).toBe(2)
-    expect(item.relatedItems?.[0].relationName).toBe('Type A')
-    expect(item.relatedItems?.[0].items.length).toBe(2)
-    expect(item.relatedItems?.[1].relationName).toBe('Type B')
-    expect(item.relatedItems?.[1].items.length).toBe(1)
+    expect(item.relatedItems?.[0]?.relationName).toBe('Type A')
+    expect(item.relatedItems?.[0]?.items.length).toBe(2)
+    expect(item.relatedItems?.[1]?.relationName).toBe('Type B')
+    expect(item.relatedItems?.[1]?.items.length).toBe(1)
   })
 
   it('ignores missing related items gracefully', () => {
@@ -126,8 +127,8 @@ describe('unlockDetailBuilder', () => {
 
     // Should still have the relation even if one item is missing
     expect(item.relatedItems?.length).toBe(1)
-    expect(item.relatedItems?.[0].items.length).toBe(1)
-    expect(item.relatedItems?.[0].items[0].name).toBe('Exists')
+    expect(item.relatedItems?.[0]?.items.length).toBe(1)
+    expect(item.relatedItems?.[0]?.items[0]?.name).toBe('Exists')
   })
 
   it('sanitizes HTML from text fields', () => {
