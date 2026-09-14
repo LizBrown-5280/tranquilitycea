@@ -463,6 +463,27 @@ describe('SwipeView', () => {
     expect(wrapper.text()).toContain('Enter up to 4 rounds')
   })
 
+  it('disables round cells until their round is reached, enabling them as the game advances', async () => {
+    const wrapper = await enterTrackerWithNamedPlayers()
+
+    const round2P1 = wrapper.find('[data-test="swipe-score-input-r2-p1"]')
+    expect((round2P1.element as HTMLInputElement).disabled).toBe(true)
+
+    for (let playerIndex = 1; playerIndex <= SWIPE_MIN_PLAYERS; playerIndex += 1) {
+      const scoreInput = wrapper.find(`[data-test="swipe-score-input-r1-p${playerIndex}"]`)
+      await scoreInput.setValue('10')
+      await scoreInput.trigger('change')
+    }
+    await wrapper.find('[data-test="swipe-next-round-button"]').trigger('click')
+
+    const round1P1 = wrapper.find('[data-test="swipe-score-input-r1-p1"]')
+    expect((round1P1.element as HTMLInputElement).disabled).toBe(false)
+    expect((round2P1.element as HTMLInputElement).disabled).toBe(false)
+
+    const round3P1 = wrapper.find('[data-test="swipe-score-input-r3-p1"]')
+    expect((round3P1.element as HTMLInputElement).disabled).toBe(true)
+  })
+
   it('grows round columns one at a time when round count is left blank', async () => {
     const wrapper = mount(SwipeView)
     await wrapper.find('[data-test="new-session-button"]').trigger('click')

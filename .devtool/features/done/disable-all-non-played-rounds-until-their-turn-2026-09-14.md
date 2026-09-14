@@ -1,13 +1,13 @@
 ---
 id: "disable-all-non-played-rounds-until-their-turn-2026-09-14"
-status: "todo"
+status: "done"
 priority: "medium"
 assignee: null
 epic: null
 dueDate: null
 created: "2026-09-14T16:40:55.254Z"
-modified: "2026-09-14T16:40:55.254Z"
-completedAt: null
+modified: "2026-09-14T17:15:00.000Z"
+completedAt: "2026-09-14T17:15:00.000Z"
 labels: []
 order: "a1"
 ---

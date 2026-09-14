@@ -276,6 +276,10 @@ const isGameLocked = computed(() => activeSession.value?.isGameLocked ?? false)
 const endedEarlyRound = computed(() => activeSession.value?.endedEarlyRound ?? null)
 const isTrackerReadOnly = computed(() => isArchivedReadOnly.value || isGameLocked.value)
 
+function isRoundEditable(round: number): boolean {
+  return round <= activeRound.value
+}
+
 const canContinueGame = computed(() => {
   return (
     !!activeSession.value &&
@@ -702,7 +706,7 @@ function getScoreInputValue(round: number, playerId: string): string {
 }
 
 function updateRoundScore(round: number, playerId: string, rawValue: string) {
-  if (!activeSession.value || isTrackerReadOnly.value) {
+  if (!activeSession.value || isTrackerReadOnly.value || !isRoundEditable(round)) {
     return
   }
 
@@ -1144,7 +1148,7 @@ function clearAllStoredSessions() {
                       :min="SWIPE_SCORE_MIN"
                       :max="SWIPE_SCORE_MAX"
                       :value="getScoreInputValue(round, player.id)"
-                      :disabled="isTrackerReadOnly"
+                      :disabled="isTrackerReadOnly || !isRoundEditable(round)"
                       @input="
                         updateRoundScore(
                           round,
