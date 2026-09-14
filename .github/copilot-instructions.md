@@ -24,6 +24,17 @@
 - Cache keys should include any profile/version discriminator that changes endpoint sets or payload shape.
 - Failure handling should preserve partial data when possible and surface endpoint-level errors for diagnostics.
 
+## Version Control
+
+- Prefix every commit title with its type: `feat`, `bug`, or `tech debt` if not alread done.
+- Before each commit (except docs/kanban-only changes with no app code), bump `package.json`'s `version`:
+  - `feat` → minor bump (e.g. 0.1.0 → 0.2.0)
+  - `bug` → patch bump (e.g. 0.1.0 → 0.1.1)
+  - `tech debt` → patch bump (e.g. 0.1.0 → 0.1.1)
+  - Breaking changes → major bump (e.g. 0.1.0 → 1.0.0), regardless of prefix
+- Include the version bump in the same commit as the work it belongs to.
+- Update related kanban ticket file(s) in `.devtool/features/` (e.g. move to `done`) before committing, so the ticket status change is included in the same commit and push as the work it tracks.
+
 ## Other Notes
 
 - Use relevant backlog items to guide development and prioritize tasks
