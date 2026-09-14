@@ -1,13 +1,13 @@
 ---
 id: "version-control-2026-09-14"
-status: "todo"
+status: "done"
 priority: "medium"
 assignee: null
 epic: null
 dueDate: null
 created: "2026-09-14T17:07:01.886Z"
-modified: "2026-09-14T17:07:04.746Z"
-completedAt: null
+modified: "2026-09-14T11:50:00.000-06:00"
+completedAt: "2026-09-14T11:50:00.000-06:00"
 labels: []
 order: "a4"
 ---
