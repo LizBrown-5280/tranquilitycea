@@ -2,6 +2,8 @@ export type SwipeSessionShellState = 'setup' | 'tracker'
 
 export type SwipeWinnerValueMode = 'zero' | 'minusTen'
 
+export type SwipeWinDirection = 'lowest' | 'highest'
+
 export interface SwipePlayer {
   id: string
   name: string
@@ -12,6 +14,8 @@ export type SwipeScoresByRound = Record<number, Record<string, number | null>>
 export const SWIPE_MIN_PLAYERS = 3
 export const SWIPE_MAX_PLAYERS = 8
 export const SWIPE_TOTAL_ROUNDS = 12
+export const SWIPE_MIN_ROUNDS = 1
+export const SWIPE_MAX_ROUNDS = 99
 export const SWIPE_SCORE_MIN = -999
 export const SWIPE_SCORE_MAX = 999
 
@@ -30,12 +34,16 @@ export interface SwipeSessionEnvelope {
   shellState: SwipeSessionShellState
   /** Player list in clockwise order, starting with first player. */
   players: SwipePlayer[]
-  /** Active round number (1-12). */
+  /** Active round number (1-based). */
   currentRound: number
+  /** Fixed round total, or null for an open-ended game. */
+  roundCount: number | null
   /** Index of player currently going first for this round. */
   currentStartingPlayerIndex: number
   /** Winner score mode for winner chip autofill. */
   winnerValueMode: SwipeWinnerValueMode
+  /** Whether the lowest or highest running total wins. */
+  winDirection: SwipeWinDirection
   /** Prevents score edits after game completion until manually unlocked. */
   isGameLocked: boolean
   /** Stores the round the game was ended early from, if applicable. */
@@ -64,6 +72,11 @@ export function clampSwipePlayerCount(count: number): number {
   return Math.max(SWIPE_MIN_PLAYERS, Math.min(SWIPE_MAX_PLAYERS, normalized))
 }
 
+export function clampSwipeRoundCount(count: number): number {
+  const normalized = Math.trunc(count)
+  return Math.max(SWIPE_MIN_ROUNDS, Math.min(SWIPE_MAX_ROUNDS, normalized))
+}
+
 export function createDefaultSwipePlayers(count: number = SWIPE_MIN_PLAYERS): SwipePlayer[] {
   const safeCount = clampSwipePlayerCount(count)
   return Array.from({ length: safeCount }, (_, index) => ({
@@ -72,10 +85,13 @@ export function createDefaultSwipePlayers(count: number = SWIPE_MIN_PLAYERS): Sw
   }))
 }
 
-export function createEmptySwipeScoresByRound(players: SwipePlayer[]): SwipeScoresByRound {
+export function createEmptySwipeScoresByRound(
+  players: SwipePlayer[],
+  totalRounds: number = SWIPE_TOTAL_ROUNDS,
+): SwipeScoresByRound {
   const scoresByRound: SwipeScoresByRound = {}
 
-  for (let round = 1; round <= SWIPE_TOTAL_ROUNDS; round += 1) {
+  for (let round = 1; round <= totalRounds; round += 1) {
     const roundScores: Record<string, number | null> = {}
     for (const player of players) {
       roundScores[player.id] = null
@@ -84,6 +100,47 @@ export function createEmptySwipeScoresByRound(players: SwipePlayer[]): SwipeScor
   }
 
   return scoresByRound
+}
+
+/** Round numbers already present in the score matrix, ascending. */
+function getStoredRoundNumbers(session: SwipeSessionEnvelope): number[] {
+  return Object.keys(session.scoresByRound)
+    .map((key) => Number(key))
+    .filter((round) => Number.isInteger(round) && round > 0)
+    .sort((first, second) => first - second)
+}
+
+export function updateSwipeSessionRoundCount(
+  session: SwipeSessionEnvelope,
+  requestedCount: number | null,
+): SwipeSessionEnvelope {
+  const nextRoundCount = requestedCount === null ? null : clampSwipeRoundCount(requestedCount)
+  const nextScoresByRound: SwipeScoresByRound = { ...session.scoresByRound }
+
+  if (nextRoundCount !== null) {
+    for (let round = 1; round <= nextRoundCount; round += 1) {
+      if (nextScoresByRound[round]) {
+        continue
+      }
+
+      const roundScores: Record<string, number | null> = {}
+      for (const player of session.players) {
+        roundScores[player.id] = null
+      }
+      nextScoresByRound[round] = roundScores
+    }
+  }
+
+  return {
+    ...session,
+    roundCount: nextRoundCount,
+    currentRound:
+      nextRoundCount === null
+        ? session.currentRound
+        : Math.min(session.currentRound, nextRoundCount),
+    scoresByRound: nextScoresByRound,
+    updatedAt: Date.now(),
+  }
 }
 
 export function updateSwipeSessionPlayers(
@@ -99,7 +156,7 @@ export function updateSwipeSessionPlayers(
   }
 
   const nextScoresByRound: SwipeScoresByRound = {}
-  for (let round = 1; round <= SWIPE_TOTAL_ROUNDS; round += 1) {
+  for (const round of getStoredRoundNumbers(session)) {
     const previousRoundScores = session.scoresByRound[round] ?? {}
     const nextRoundScores: Record<string, number | null> = {}
 
@@ -156,11 +213,13 @@ export function createEmptySwipeSessionEnvelope(now: number = Date.now()): Swipe
     shellState: 'setup',
     players,
     currentRound: 1,
+    roundCount: SWIPE_TOTAL_ROUNDS,
     currentStartingPlayerIndex: 0,
     winnerValueMode: 'zero',
+    winDirection: 'lowest',
     isGameLocked: false,
     endedEarlyRound: null,
     scoresByRound: createEmptySwipeScoresByRound(players),
-    schemaVersion: 3,
+    schemaVersion: 5,
   }
 }

@@ -11,7 +11,40 @@ import {
   updateSwipePlayerName,
   updateSwipeSessionPlayers,
 } from '@/types/swipe'
-import { getTruncatedSwipeName } from '@/services/swipe/swipeConstants'
+import {
+  getTruncatedSwipeName,
+  getSwipeRanksByPlayer,
+  getSwipeRankTier,
+} from '@/services/swipe/swipeConstants'
+
+describe('swipe ranking helpers', () => {
+  const totals = { a: 30, b: 10, c: 20, d: 10 }
+
+  it('ranks lowest total first with shared ranks for ties', () => {
+    expect(getSwipeRanksByPlayer(['a', 'b', 'c', 'd'], totals, 'lowest')).toEqual({
+      b: 1,
+      d: 1,
+      c: 3,
+      a: 4,
+    })
+  })
+
+  it('ranks highest total first when direction is highest', () => {
+    expect(getSwipeRanksByPlayer(['a', 'b', 'c', 'd'], totals, 'highest')).toEqual({
+      a: 1,
+      c: 2,
+      b: 3,
+      d: 3,
+    })
+  })
+
+  it('maps ranks to badge tiers', () => {
+    expect(getSwipeRankTier(1)).toBe('first')
+    expect(getSwipeRankTier(2)).toBe('second')
+    expect(getSwipeRankTier(3)).toBe('third')
+    expect(getSwipeRankTier(4)).toBe('neutral')
+  })
+})
 
 describe('swipe model helpers', () => {
   it('creates default session in setup mode with minimum players', () => {

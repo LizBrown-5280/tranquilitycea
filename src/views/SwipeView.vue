@@ -14,22 +14,27 @@ import {
 } from '@/services/swipe/sessionStorage'
 import {
   SWIPE_MAX_PLAYERS,
+  SWIPE_MAX_ROUNDS,
   SWIPE_MIN_PLAYERS,
+  SWIPE_MIN_ROUNDS,
   SWIPE_SCORE_MAX,
   SWIPE_SCORE_MIN,
-  SWIPE_TOTAL_ROUNDS,
   clampSwipePlayerCount,
   createEmptySwipeSessionEnvelope,
   normalizeSwipeScore,
   type SwipeSessionEnvelope,
+  type SwipeWinDirection,
   type SwipeWinnerValueMode,
   updateSwipePlayerName,
   updateSwipeSessionPlayers,
+  updateSwipeSessionRoundCount,
 } from '@/types/swipe'
 import {
   getSwipeDisplayName,
   hasMinimumNamedPlayers,
   getTruncatedSwipeName,
+  getSwipeRanksByPlayer,
+  getSwipeRankTier,
 } from '@/services/swipe/swipeConstants'
 
 const {
@@ -69,7 +74,30 @@ const ENTRY_TRANSITION_TOTAL_MS = 1700
 const NEW_SESSION_START_DELAY_MS = 80
 
 const setupPlayerCount = ref<number>(SWIPE_MIN_PLAYERS)
-const roundNumbers = Array.from({ length: SWIPE_TOTAL_ROUNDS }, (_, index) => index + 1)
+const rowOrderMode = ref<'seated' | 'ranked'>('seated')
+
+const sessionRoundCount = computed(() => activeSession.value?.roundCount ?? null)
+
+const highestScoredRound = computed(() => {
+  const scoresByRound = activeSession.value?.scoresByRound ?? {}
+  return Object.entries(scoresByRound).reduce((highest, [roundKey, roundScores]) => {
+    const round = Number(roundKey)
+    const hasScore = Object.values(roundScores ?? {}).some((value) => typeof value === 'number')
+    return hasScore && round > highest ? round : highest
+  }, 0)
+})
+
+const visibleRoundCount = computed(() => {
+  if (sessionRoundCount.value !== null) {
+    return sessionRoundCount.value
+  }
+
+  return Math.max(activeSession.value?.currentRound ?? 1, highestScoredRound.value, 1)
+})
+
+const roundNumbers = computed(() =>
+  Array.from({ length: visibleRoundCount.value }, (_, index) => index + 1),
+)
 
 const shouldRenderChooserContent = computed(() => {
   return sessionChooserState.value === 'showing' || isEntryTransitionRunning.value
@@ -98,6 +126,7 @@ const trackerPlayerPreview = computed(() => {
     const fullName = getSwipeDisplayName(player.name, index)
     return {
       id: player.id,
+      seatIndex: index,
       fullName,
       shortName: getTruncatedSwipeName(fullName),
     }
@@ -115,7 +144,7 @@ const runningTotalsByPlayer = computed(() => {
     return totals
   }
 
-  for (const round of roundNumbers) {
+  for (const round of roundNumbers.value) {
     const roundScores = activeSession.value.scoresByRound[round] ?? {}
     for (const player of activeSession.value.players) {
       const value = roundScores[player.id]
@@ -130,7 +159,46 @@ const runningTotalsByPlayer = computed(() => {
 
 const activeRound = computed(() => activeSession.value?.currentRound ?? 1)
 
-const isFinalRound = computed(() => activeRound.value >= SWIPE_TOTAL_ROUNDS)
+const winDirection = computed<SwipeWinDirection>(
+  () => activeSession.value?.winDirection ?? 'lowest',
+)
+
+const hasAnyRecordedScores = computed(() => highestScoredRound.value > 0)
+
+const ranksByPlayer = computed(() => {
+  return getSwipeRanksByPlayer(
+    (activeSession.value?.players ?? []).map((player) => player.id),
+    runningTotalsByPlayer.value,
+    winDirection.value,
+  )
+})
+
+const trackerRows = computed(() => {
+  return trackerPlayerPreview.value.map((player) => {
+    const rank = ranksByPlayer.value[player.id] ?? player.seatIndex + 1
+    return {
+      ...player,
+      rank,
+      rankLabel: hasAnyRecordedScores.value ? String(rank) : '–',
+      rankTier: hasAnyRecordedScores.value ? getSwipeRankTier(rank) : 'neutral',
+    }
+  })
+})
+
+const orderedTrackerRows = computed(() => {
+  if (rowOrderMode.value === 'seated') {
+    return trackerRows.value
+  }
+
+  return [...trackerRows.value].sort((first, second) => {
+    return first.rank - second.rank || first.seatIndex - second.seatIndex
+  })
+})
+
+const isFinalRound = computed(() => {
+  const finalRound = sessionRoundCount.value ?? SWIPE_MAX_ROUNDS
+  return activeRound.value >= finalRound
+})
 
 const isCurrentRoundComplete = computed(() => {
   if (!activeSession.value) {
@@ -147,7 +215,7 @@ const completedRoundsCount = computed(() => {
   }
 
   let completedCount = 0
-  for (const round of roundNumbers) {
+  for (const round of roundNumbers.value) {
     const roundScores = activeSession.value.scoresByRound[round] ?? {}
     const isRoundComplete = activeSession.value.players.every(
       (player) => typeof roundScores[player.id] === 'number',
@@ -225,6 +293,22 @@ const displayedRoundNumber = computed(() => {
   return activeRound.value
 })
 
+const roundBadgeText = computed(() => {
+  if (sessionRoundCount.value === null) {
+    return `Round ${displayedRoundNumber.value}`
+  }
+
+  return `Round ${displayedRoundNumber.value} / ${sessionRoundCount.value}`
+})
+
+const trackerDirectionText = computed(() => {
+  if (sessionRoundCount.value === null) {
+    return "Click 'Next Round' button to add new round column."
+  }
+
+  return `Enter up to ${sessionRoundCount.value} rounds or stop whenever you like.`
+})
+
 const winnerPlayerIds = computed(() => {
   if (!isGameComplete.value || !activeSession.value) {
     return [] as string[]
@@ -238,7 +322,13 @@ const winnerPlayerIds = computed(() => {
   const minTotal = Math.min(
     ...playerIds.map((playerId) => runningTotalsByPlayer.value[playerId] ?? 0),
   )
-  return playerIds.filter((playerId) => (runningTotalsByPlayer.value[playerId] ?? 0) === minTotal)
+  const maxTotal = Math.max(
+    ...playerIds.map((playerId) => runningTotalsByPlayer.value[playerId] ?? 0),
+  )
+  const winningTotal = winDirection.value === 'highest' ? maxTotal : minTotal
+  return playerIds.filter(
+    (playerId) => (runningTotalsByPlayer.value[playerId] ?? 0) === winningTotal,
+  )
 })
 
 const winnerSummaryText = computed(() => {
@@ -399,6 +489,26 @@ function updateSetupPlayerName(playerId: string, nextName: string) {
   persistSwipeSession(updatedSession)
 }
 
+function setSetupRoundCount(rawValue: string) {
+  if (!activeSession.value) {
+    return
+  }
+
+  const trimmedValue = rawValue.trim()
+
+  if (trimmedValue.length === 0) {
+    persistSwipeSession(updateSwipeSessionRoundCount(activeSession.value, null))
+    return
+  }
+
+  const parsedValue = Number(trimmedValue)
+  if (!Number.isFinite(parsedValue)) {
+    return
+  }
+
+  persistSwipeSession(updateSwipeSessionRoundCount(activeSession.value, parsedValue))
+}
+
 function updateWinnerMode(nextMode: SwipeWinnerValueMode) {
   if (!activeSession.value) {
     return
@@ -411,6 +521,24 @@ function updateWinnerMode(nextMode: SwipeWinnerValueMode) {
   }
 
   persistSwipeSession(updatedSession)
+}
+
+function updateWinDirection(nextDirection: SwipeWinDirection) {
+  if (!activeSession.value) {
+    return
+  }
+
+  const updatedSession: SwipeSessionEnvelope = {
+    ...activeSession.value,
+    winDirection: nextDirection,
+    updatedAt: Date.now(),
+  }
+
+  persistSwipeSession(updatedSession)
+}
+
+function toggleRowOrderMode() {
+  rowOrderMode.value = rowOrderMode.value === 'seated' ? 'ranked' : 'seated'
 }
 
 function beginTrackerFromSetup() {
@@ -462,7 +590,10 @@ function advanceToNextRound() {
     return
   }
 
-  const nextRound = Math.min(activeSession.value.currentRound + 1, SWIPE_TOTAL_ROUNDS)
+  const nextRound = Math.min(
+    activeSession.value.currentRound + 1,
+    sessionRoundCount.value ?? SWIPE_MAX_ROUNDS,
+  )
   const nextStartingPlayerIndex =
     activeSession.value.players.length > 0
       ? (activeSession.value.currentStartingPlayerIndex + 1) % activeSession.value.players.length
@@ -476,6 +607,8 @@ function advanceToNextRound() {
   }
 
   persistSwipeSession(updatedSession)
+
+  rowOrderMode.value = 'seated'
 
   const nextStartingPlayer = updatedSession.players[nextStartingPlayerIndex]
   if (nextStartingPlayer) {
@@ -775,6 +908,23 @@ function clearAllStoredSessions() {
               </div>
             </label>
 
+            <label class="setup-field" for="swipe-round-count">
+              <span>Rounds</span>
+              <input
+                id="swipe-round-count"
+                data-test="swipe-round-count-input"
+                class="round-count-input"
+                type="number"
+                inputmode="numeric"
+                :min="SWIPE_MIN_ROUNDS"
+                :max="SWIPE_MAX_ROUNDS"
+                placeholder="Open-ended"
+                :value="sessionRoundCount ?? ''"
+                @change="setSetupRoundCount(($event.target as HTMLInputElement).value)"
+              />
+              <span class="setup-hint">Leave blank to add rounds as you go.</span>
+            </label>
+
             <fieldset class="setup-field winner-mode-field">
               <legend>Winner Value</legend>
               Choose the amount of points that the winning player receives per round.
@@ -799,6 +949,32 @@ function clearAllStoredSessions() {
                   @change="updateWinnerMode('minusTen')"
                 />
                 Winner gets -10
+              </label>
+            </fieldset>
+
+            <fieldset class="setup-field winner-mode-field">
+              <legend>Does the lowest or highest total wins?</legend>
+              <label>
+                <input
+                  data-test="swipe-win-direction-lowest"
+                  type="radio"
+                  name="swipe-win-direction"
+                  value="lowest"
+                  :checked="winDirection === 'lowest'"
+                  @change="updateWinDirection('lowest')"
+                />
+                Lowest
+              </label>
+              <label>
+                <input
+                  data-test="swipe-win-direction-highest"
+                  type="radio"
+                  name="swipe-win-direction"
+                  value="highest"
+                  :checked="winDirection === 'highest'"
+                  @change="updateWinDirection('highest')"
+                />
+                Highest
               </label>
             </fieldset>
           </div>
@@ -842,16 +1018,25 @@ function clearAllStoredSessions() {
         <section v-else-if="isTrackerShell" class="tracker-shell" data-test="swipe-tracker-shell">
           <div class="tracker-shell-header">
             <h2>Swipe Tracker</h2>
-            <p>Enter up to 12 rounds or stop whenever you like.</p>
+            <p>{{ trackerDirectionText }}</p>
           </div>
 
           <div class="round-progress-controls" data-test="swipe-round-progress">
             <div class="round-badge" data-test="swipe-round-badge">
-              Round {{ displayedRoundNumber }} / {{ SWIPE_TOTAL_ROUNDS }}
+              {{ roundBadgeText }}
             </div>
             <div v-if="trackerStatusLabel" class="round-status" data-test="swipe-round-status">
               {{ trackerStatusLabel }}
             </div>
+            <button
+              type="button"
+              class="order-toggle-button"
+              data-test="swipe-row-order-toggle"
+              :aria-pressed="rowOrderMode === 'ranked'"
+              @click="toggleRowOrderMode"
+            >
+              {{ rowOrderMode === 'seated' ? 'Sort by rank' : 'Sort by seat' }}
+            </button>
           </div>
 
           <div
@@ -883,7 +1068,16 @@ function clearAllStoredSessions() {
             <span>{{ winnerSummaryText }}</span>
           </div>
 
-          <section class="score-grid-shell" data-test="swipe-score-grid">
+          <p class="tracker-legend" data-test="swipe-starting-player-legend">
+            <span class="tracker-legend-swatch" aria-hidden="true"></span>
+            Blue bar marks who starts the round. It rotates one seat each round.
+          </p>
+
+          <section
+            class="score-grid-shell"
+            data-test="swipe-score-grid"
+            :style="{ '--score-round-count': roundNumbers.length }"
+          >
             <div class="score-grid-table">
               <div class="score-grid-head">
                 <div class="score-grid-player-header">Player</div>
@@ -901,18 +1095,33 @@ function clearAllStoredSessions() {
               </div>
 
               <div
-                v-for="(player, index) in trackerPlayerPreview"
+                v-for="(player, rowIndex) in orderedTrackerRows"
                 :key="`row-${player.id}`"
-                :data-test="`swipe-score-row-p${index + 1}`"
+                :data-test="`swipe-score-row-p${player.seatIndex + 1}`"
                 class="score-grid-row"
                 :class="{
-                  'score-grid-row--starting': index === activeSession?.currentStartingPlayerIndex,
+                  'score-grid-row--starting':
+                    player.seatIndex === activeSession?.currentStartingPlayerIndex,
                   'score-grid-row--pulse': player.id === roundAdvancePulsePlayerId,
                   'score-grid-row--winner': isGameComplete && winnerPlayerIds.includes(player.id),
                 }"
               >
-                <div class="score-grid-player-cell" :title="player.fullName">
-                  <span>{{ player.shortName }}</span>
+                <div
+                  class="score-grid-player-cell"
+                  :title="
+                    player.seatIndex === activeSession?.currentStartingPlayerIndex
+                      ? `${player.fullName} \u2014 starts this round`
+                      : player.fullName
+                  "
+                >
+                  <span
+                    class="rank-badge"
+                    :class="`rank-badge--${player.rankTier}`"
+                    :data-test="`swipe-rank-badge-p${player.seatIndex + 1}`"
+                    :aria-label="`${player.fullName} rank ${player.rankLabel}`"
+                    >{{ player.rankLabel }}</span
+                  >
+                  <span class="player-name">{{ player.shortName }}</span>
                 </div>
 
                 <div class="score-grid-rounds-scroll">
@@ -923,13 +1132,13 @@ function clearAllStoredSessions() {
                     :class="{
                       'score-input-wrap--active': round === activeRound,
                       'score-input-wrap--active-last':
-                        round === activeRound && index === trackerPlayerPreview.length - 1,
+                        round === activeRound && rowIndex === orderedTrackerRows.length - 1,
                     }"
                     :aria-label="`${player.fullName} round ${round}`"
                   >
                     <span class="sr-only">{{ player.fullName }} round {{ round }}</span>
                     <input
-                      :data-test="`swipe-score-input-r${round}-p${index + 1}`"
+                      :data-test="`swipe-score-input-r${round}-p${player.seatIndex + 1}`"
                       type="number"
                       inputmode="numeric"
                       :min="SWIPE_SCORE_MIN"
@@ -960,7 +1169,7 @@ function clearAllStoredSessions() {
                     'score-grid-total-cell--winner':
                       isGameComplete && winnerPlayerIds.includes(player.id),
                   }"
-                  :data-test="`swipe-running-total-p${index + 1}`"
+                  :data-test="`swipe-running-total-p${player.seatIndex + 1}`"
                   :title="`Running total for ${player.fullName}`"
                 >
                   {{ runningTotalsByPlayer[player.id] ?? 0 }}
@@ -1189,6 +1398,24 @@ h1 {
   font-weight: 700;
 }
 
+.round-count-input {
+  width: 7rem;
+  height: 2rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  padding: 0 0.5rem;
+  text-align: center;
+  font-weight: 700;
+}
+
+.setup-field > span.setup-hint {
+  font-size: 0.74rem;
+  color: var(--ui-muted);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .winner-mode-field {
   border: 1px solid var(--ui-border);
   border-radius: 10px;
@@ -1271,6 +1498,21 @@ h1 {
   color: #255a2a;
   font-weight: 700;
   line-height: 1;
+}
+
+.order-toggle-button {
+  border: 1px solid #7eb4d4;
+  border-radius: 999px;
+  background: #fff;
+  color: #255777;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.order-toggle-button[aria-pressed='true'] {
+  background: #edf7ff;
 }
 
 .round-bottom-actions {
@@ -1410,11 +1652,27 @@ h1 {
 
 .score-grid-shell {
   --score-round-col-width: 3.25rem;
-  --score-round-count: 12;
   border: 1px solid var(--ui-border);
   border-radius: 12px;
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+.tracker-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--ui-muted);
+}
+
+.tracker-legend-swatch {
+  display: inline-block;
+  width: 3px;
+  height: 0.9rem;
+  border-radius: 2px;
+  background: #3f8fc0;
 }
 
 .score-grid-table {
@@ -1424,7 +1682,7 @@ h1 {
 .score-grid-head,
 .score-grid-row {
   display: grid;
-  grid-template-columns: 4.6rem calc(var(--score-round-col-width) * var(--score-round-count)) 4.8rem;
+  grid-template-columns: 6rem calc(var(--score-round-col-width) * var(--score-round-count)) 4.8rem;
   align-items: stretch;
 }
 
@@ -1449,6 +1707,8 @@ h1 {
 
 .score-grid-player-header {
   left: 0;
+  justify-content: flex-start;
+  padding-left: 0.35rem;
   border-right: 1px solid #d7e1ea;
   background: #f0f6fb;
 }
@@ -1521,13 +1781,60 @@ h1 {
 
 .score-grid-player-cell {
   left: 0;
+  gap: 0.35rem;
+  justify-content: flex-start;
+  padding-left: 0.35rem;
   border-right: 1px solid #dce6ef;
   background: #fbfdff;
   box-shadow: 6px 0 8px -8px rgba(35, 62, 87, 0.32);
 }
 
-.score-grid-player-cell span {
+.score-grid-player-cell .player-name {
   display: inline-block;
+  text-align: left;
+}
+
+.rank-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #c8d3dd;
+  background: #eef2f6;
+  color: #4b6072;
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+}
+
+.rank-badge--first {
+  border-color: #1d7a3c;
+  background: #22a24a;
+  color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(29, 122, 60, 0.3);
+}
+
+.rank-badge--second {
+  border-color: #4fbf78;
+  background: #8fe0aa;
+  color: #14512a;
+}
+
+.rank-badge--third {
+  border-color: #a9c9b3;
+  background: #dcf3e3;
+  color: #2c5c3c;
+}
+
+.rank-badge--neutral {
+  border-color: #c8d3dd;
+  background: #eef2f6;
+  color: #5a6f82;
 }
 
 .score-grid-total-cell {

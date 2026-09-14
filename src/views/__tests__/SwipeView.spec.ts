@@ -405,6 +405,94 @@ describe('SwipeView', () => {
     expect(player3Row.classes()).not.toContain('score-grid-row--winner')
   })
 
+  it('sorts rows by rank on toggle and resets to seating order on next round', async () => {
+    const wrapper = await enterTrackerWithNamedPlayers()
+
+    const roundOneScores = [30, 10, 20]
+    for (const [index, score] of roundOneScores.entries()) {
+      const scoreInput = wrapper.find(`[data-test="swipe-score-input-r1-p${index + 1}"]`)
+      await scoreInput.setValue(String(score))
+      await scoreInput.trigger('change')
+    }
+
+    const getRowOrder = () =>
+      wrapper.findAll('.score-grid-row').map((row) => row.attributes('data-test'))
+
+    expect(getRowOrder()).toEqual([
+      'swipe-score-row-p1',
+      'swipe-score-row-p2',
+      'swipe-score-row-p3',
+    ])
+
+    const orderToggle = wrapper.find('[data-test="swipe-row-order-toggle"]')
+    await orderToggle.trigger('click')
+
+    expect(getRowOrder()).toEqual([
+      'swipe-score-row-p2',
+      'swipe-score-row-p3',
+      'swipe-score-row-p1',
+    ])
+    expect(wrapper.find('[data-test="swipe-rank-badge-p2"]').text()).toBe('1')
+
+    await wrapper.find('[data-test="swipe-next-round-button"]').trigger('click')
+
+    expect(getRowOrder()).toEqual([
+      'swipe-score-row-p1',
+      'swipe-score-row-p2',
+      'swipe-score-row-p3',
+    ])
+    expect(wrapper.find('[data-test="swipe-row-order-toggle"]').text()).toBe('Sort by rank')
+  })
+
+  it('renders the chosen number of round columns', async () => {
+    const wrapper = mount(SwipeView)
+    await wrapper.find('[data-test="new-session-button"]').trigger('click')
+
+    const roundCountInput = wrapper.find('[data-test="swipe-round-count-input"]')
+    await roundCountInput.setValue('4')
+    await roundCountInput.trigger('change')
+
+    const playerInputs = wrapper.findAll('[data-test^="swipe-player-name-"]')
+    for (const [index, input] of playerInputs.entries()) {
+      await input.setValue(`Player ${index + 1}`)
+    }
+    await wrapper.find('[data-test="swipe-start-tracker-button"]').trigger('click')
+
+    expect(wrapper.findAll('.score-grid-round-header')).toHaveLength(4)
+    expect(wrapper.find('[data-test="swipe-round-badge"]').text()).toContain('Round 1 / 4')
+    expect(wrapper.text()).toContain('Enter up to 4 rounds')
+  })
+
+  it('grows round columns one at a time when round count is left blank', async () => {
+    const wrapper = mount(SwipeView)
+    await wrapper.find('[data-test="new-session-button"]').trigger('click')
+
+    const roundCountInput = wrapper.find('[data-test="swipe-round-count-input"]')
+    await roundCountInput.setValue('')
+    await roundCountInput.trigger('change')
+
+    const playerInputs = wrapper.findAll('[data-test^="swipe-player-name-"]')
+    for (const [index, input] of playerInputs.entries()) {
+      await input.setValue(`Player ${index + 1}`)
+    }
+    await wrapper.find('[data-test="swipe-start-tracker-button"]').trigger('click')
+
+    expect(wrapper.findAll('.score-grid-round-header')).toHaveLength(1)
+    expect(wrapper.find('[data-test="swipe-round-badge"]').text().trim()).toBe('Round 1')
+    expect(wrapper.text()).toContain("Click 'Next Round' button to add new round column")
+
+    for (let playerIndex = 1; playerIndex <= SWIPE_MIN_PLAYERS; playerIndex += 1) {
+      const scoreInput = wrapper.find(`[data-test="swipe-score-input-r1-p${playerIndex}"]`)
+      await scoreInput.setValue('10')
+      await scoreInput.trigger('change')
+    }
+
+    await wrapper.find('[data-test="swipe-next-round-button"]').trigger('click')
+
+    expect(wrapper.findAll('.score-grid-round-header')).toHaveLength(2)
+    expect(wrapper.find('[data-test="swipe-round-badge"]').text().trim()).toBe('Round 2')
+  })
+
   it('auto-locks completed game without showing lock controls', async () => {
     const wrapper = await enterTrackerWithNamedPlayers()
 
