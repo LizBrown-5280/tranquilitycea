@@ -280,6 +280,16 @@ function isRoundEditable(round: number): boolean {
   return round <= activeRound.value
 }
 
+const NON_INTEGER_NUMBER_KEYS = ['e', 'E', '+', '.']
+
+/** Number inputs otherwise allow e/E/+/. since they're valid partial scientific notation. */
+function blockNonIntegerNumberKey(event: KeyboardEvent, { allowNegative = false } = {}) {
+  const blockedKeys = allowNegative ? NON_INTEGER_NUMBER_KEYS : [...NON_INTEGER_NUMBER_KEYS, '-']
+  if (blockedKeys.includes(event.key)) {
+    event.preventDefault()
+  }
+}
+
 const canContinueGame = computed(() => {
   return (
     !!activeSession.value &&
@@ -898,6 +908,7 @@ function clearAllStoredSessions() {
                   :min="SWIPE_MIN_PLAYERS"
                   :max="SWIPE_MAX_PLAYERS"
                   :value="setupPlayerCount"
+                  @keydown="blockNonIntegerNumberKey($event)"
                   @change="setSetupPlayerCount(Number(($event.target as HTMLInputElement).value))"
                 />
                 <button
@@ -924,6 +935,7 @@ function clearAllStoredSessions() {
                 :max="SWIPE_MAX_ROUNDS"
                 placeholder="Open-ended"
                 :value="sessionRoundCount ?? ''"
+                @keydown="blockNonIntegerNumberKey($event)"
                 @change="setSetupRoundCount(($event.target as HTMLInputElement).value)"
               />
               <span class="setup-hint">Leave blank to add rounds as you go.</span>
@@ -1149,6 +1161,7 @@ function clearAllStoredSessions() {
                       :max="SWIPE_SCORE_MAX"
                       :value="getScoreInputValue(round, player.id)"
                       :disabled="isTrackerReadOnly || !isRoundEditable(round)"
+                      @keydown="blockNonIntegerNumberKey($event, { allowNegative: true })"
                       @input="
                         updateRoundScore(
                           round,
