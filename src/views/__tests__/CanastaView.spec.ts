@@ -474,6 +474,9 @@ describe('CanastaView', () => {
       await wrapper.find('[data-test="settings-button"]').trigger('click')
 
       expect(wrapper.find('[data-test="settings-panel"]').exists()).toBe(true)
+      const versionRow = wrapper.find('[data-test="settings-app-version"]')
+      expect(versionRow.find('.settings-field__label').text()).toBe('Version')
+      expect(versionRow.find('.settings-field__value').text()).toMatch(/^\d+\.\d+\.\d+$/)
 
       await wrapper.find('[data-test="settings-close-button"]').trigger('click')
 

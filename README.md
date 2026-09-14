@@ -96,10 +96,36 @@ npm run test:unit
 npm run lint
 ```
 
+### Use the Kanban board
+
+Ctrl + Shift + P --> Search for `Kanban`
+
+Be sure to title the ticket with eitehr `feat: ...`, `bug: ...` or `tech debt: ...`
+
+### Commit messages
+
+Commit messages should use one of these prefixes:
+
+```
+feat: ...
+bug: ...
+tech debt: ...
+```
+
+### Release Version
+
+Before committing application changes, update the version field in package.json. Use a minor version bump for a new feature, a patch bump for a bug fix or technical debt, and a major bump for breaking changes.
+
 ### Deploy to Firebase
 
+_Besure to version the app before building._
+
+Test, Build and validatethe app before deploying:
+
 ```sh
-firebase deploy
+npm run test:unit
+npm run build
+npx firebase-tools deploy --only hosting:workshop --project portfolio-liz
 ```
 
 ---

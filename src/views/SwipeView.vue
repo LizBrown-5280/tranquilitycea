@@ -75,8 +75,6 @@ const entryTransitionMetrics = ref({
 const ENTRY_TRANSITION_TOTAL_MS = 1700
 const NEW_SESSION_START_DELAY_MS = 80
 
-const appVersion = __APP_VERSION__
-
 const setupPlayerCount = ref<number>(SWIPE_MIN_PLAYERS)
 const rowOrderMode = ref<'seated' | 'ranked'>('seated')
 
@@ -887,8 +885,6 @@ function clearAllStoredSessions() {
       <p v-if="isArchivedReadOnly && sessionChooserState === 'hidden'" class="readonly-badge">
         Archived Session (Read-Only)
       </p>
-
-      <span class="app-version" data-test="swipe-app-version">v. {{ appVersion }}</span>
     </header>
 
     <SwipeSettingsModal
@@ -1323,14 +1319,6 @@ function clearAllStoredSessions() {
   padding: 1rem;
   background: linear-gradient(140deg, rgba(240, 250, 240, 0.9), rgba(255, 255, 255, 0.9));
   box-shadow: 0 8px 32px rgba(26, 41, 52, 0.08);
-}
-
-.app-version {
-  position: absolute;
-  right: 0.75rem;
-  bottom: 0.4rem;
-  font-size: 0.65rem;
-  color: var(--ui-muted, #7a8a80);
 }
 
 .swipe-page--entry-transition {

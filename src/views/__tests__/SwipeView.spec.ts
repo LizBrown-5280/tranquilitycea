@@ -153,12 +153,16 @@ describe('SwipeView', () => {
     expect((minusTen.element as HTMLInputElement).checked).toBe(true)
   })
 
-  it('shows the app version in the header', () => {
+  it('shows the app version in the settings panel', async () => {
     const wrapper = mount(SwipeView)
 
-    const versionLabel = wrapper.find('[data-test="swipe-app-version"]')
+    await wrapper.find('[data-test="new-session-button"]').trigger('click')
+    await wrapper.find('[data-test="settings-button"]').trigger('click')
+
+    const versionLabel = wrapper.find('[data-test="swipe-settings-app-version"]')
     expect(versionLabel.exists()).toBe(true)
-    expect(versionLabel.text()).toMatch(/^v\. \d+\.\d+\.\d+$/)
+    expect(versionLabel.find('.settings-field__label').text()).toBe('Version')
+    expect(versionLabel.find('.settings-field__value').text()).toMatch(/^\d+\.\d+\.\d+$/)
   })
 
   it('renders sticky score grid after setup starts tracker', async () => {

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const appVersion = __APP_VERSION__
+
 defineProps<{
   isShowing: boolean
   retentionDays: number
@@ -55,6 +57,11 @@ function handleTooltipsChange(event: Event) {
             @change="handleTooltipsChange"
           />
         </label>
+      </div>
+
+      <div class="settings-field settings-field--version" data-test="settings-app-version">
+        <span class="settings-field__label">Version</span>
+        <span class="settings-field__value">{{ appVersion }}</span>
       </div>
 
       <div class="session-modal-actions">
@@ -138,6 +145,16 @@ function handleTooltipsChange(event: Event) {
   cursor: pointer;
 }
 
+.settings-field--version {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-field__value {
+  font-size: 0.9rem;
+}
+
 .session-modal-actions {
   display: flex;
   gap: 0.75rem;
@@ -163,6 +180,7 @@ function handleTooltipsChange(event: Event) {
   background: var(--primary);
   color: white;
   border-color: var(--primary);
+  margin-top: 40px;
 }
 
 .chooser-button--primary:hover {
