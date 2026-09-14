@@ -59,6 +59,8 @@ const retentionDays = ref<number>(90)
 const tooltipsEnabled = ref<boolean>(true)
 const roundAdvancePulsePlayerId = ref<string | null>(null)
 let roundAdvancePulseTimerId: number | null = null
+const nextRoundButtonPulse = ref(false)
+let nextRoundButtonPulseTimerId: number | null = null
 const headerLogoRef = ref<HTMLElement | null>(null)
 const entryTransitionMetrics = ref({
   startX: 0,
@@ -211,6 +213,16 @@ const isCurrentRoundComplete = computed(() => {
   return activeSession.value.players.every((player) => typeof roundScores[player.id] === 'number')
 })
 
+const hasSelectedWinner = computed(() => {
+  if (!activeSession.value) {
+    return false
+  }
+
+  const winnerValue = activeSession.value.winnerValueMode === 'minusTen' ? -10 : 0
+  const roundScores = activeSession.value.scoresByRound[activeRound.value] ?? {}
+  return Object.values(roundScores).some((value) => value === winnerValue)
+})
+
 const completedRoundsCount = computed(() => {
   if (!activeSession.value) {
     return 0
@@ -238,6 +250,7 @@ const canAdvanceRound = computed(() => {
     !!activeSession.value &&
     !isArchivedReadOnly.value &&
     isCurrentRoundComplete.value &&
+    hasSelectedWinner.value &&
     !isFinalRound.value
   )
 })
@@ -587,6 +600,27 @@ function clearRoundAdvancePulseTimer() {
   }
 }
 
+function clearNextRoundButtonPulseTimer() {
+  if (nextRoundButtonPulseTimerId !== null) {
+    window.clearTimeout(nextRoundButtonPulseTimerId)
+    nextRoundButtonPulseTimerId = null
+  }
+}
+
+function triggerNextRoundButtonPulse() {
+  if (prefersReducedMotion()) {
+    nextRoundButtonPulse.value = false
+    return
+  }
+
+  clearNextRoundButtonPulseTimer()
+  nextRoundButtonPulse.value = true
+  nextRoundButtonPulseTimerId = window.setTimeout(() => {
+    nextRoundButtonPulse.value = false
+    nextRoundButtonPulseTimerId = null
+  }, 900)
+}
+
 function triggerRoundAdvancePulse(nextPlayerId: string) {
   if (prefersReducedMotion()) {
     roundAdvancePulsePlayerId.value = null
@@ -781,6 +815,12 @@ watch(isGameComplete, (gameComplete, wasGameComplete) => {
   }
 })
 
+watch(canAdvanceRound, (canAdvance, couldAdvance) => {
+  if (canAdvance && !couldAdvance) {
+    triggerNextRoundButtonPulse()
+  }
+})
+
 onMounted(() => {
   initializeSessionChooser()
   retentionDays.value = getSessionRetentionDays()
@@ -789,6 +829,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearRoundAdvancePulseTimer()
+  clearNextRoundButtonPulseTimer()
   destroy()
 })
 
@@ -847,7 +888,7 @@ function clearAllStoredSessions() {
         Archived Session (Read-Only)
       </p>
 
-      <span class="app-version" data-test="swipe-app-version">v{{ appVersion }}</span>
+      <span class="app-version" data-test="swipe-app-version">v. {{ appVersion }}</span>
     </header>
 
     <SwipeSettingsModal
@@ -1199,6 +1240,14 @@ function clearAllStoredSessions() {
             </div>
           </section>
 
+          <p
+            v-if="!isGameComplete && isCurrentRoundComplete && !hasSelectedWinner"
+            class="winner-required-message"
+            data-test="swipe-winner-required-message"
+          >
+            Please select a winner for the round.
+          </p>
+
           <div
             v-if="!isGameComplete"
             class="round-bottom-actions"
@@ -1207,6 +1256,7 @@ function clearAllStoredSessions() {
             <button
               type="button"
               class="next-round-button"
+              :class="{ 'next-round-button--pulse': nextRoundButtonPulse }"
               data-test="swipe-next-round-button"
               :disabled="!canAdvanceRound"
               @click="advanceToNextRound"
@@ -1585,6 +1635,19 @@ h1 {
 
 .next-round-button:disabled {
   opacity: 0.55;
+}
+
+.next-round-button--pulse {
+  animation: nextRoundButtonPulse 900ms ease;
+  will-change: transform, box-shadow;
+}
+
+.winner-required-message {
+  margin: 0;
+  color: #b42318;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 .winner-chip-bar {
@@ -2003,6 +2066,42 @@ h1 {
 
   100% {
     opacity: 1;
+  }
+}
+
+@keyframes nextRoundButtonPulse {
+  0%,
+  100% {
+    transform: translateY(0) scale(1) rotate(0deg);
+    box-shadow: 0 0 0 0 rgba(73, 157, 207, 0);
+  }
+
+  18% {
+    transform: translateY(-4px) scale(1.12) rotate(-1deg);
+    box-shadow:
+      0 0 0 5px rgba(73, 157, 207, 0.22),
+      0 7px 14px rgba(47, 117, 161, 0.24);
+  }
+
+  38% {
+    transform: translateY(1px) scale(0.97) rotate(0.5deg);
+    box-shadow:
+      0 0 0 2px rgba(73, 157, 207, 0.12),
+      0 2px 5px rgba(47, 117, 161, 0.14);
+  }
+
+  58% {
+    transform: translateY(-2px) scale(1.06) rotate(0.5deg);
+    box-shadow:
+      0 0 0 4px rgba(73, 157, 207, 0.18),
+      0 5px 10px rgba(47, 117, 161, 0.2);
+  }
+
+  78% {
+    transform: translateY(0) scale(0.99) rotate(0deg);
+    box-shadow:
+      0 0 0 1px rgba(73, 157, 207, 0.08),
+      0 1px 3px rgba(47, 117, 161, 0.1);
   }
 }
 

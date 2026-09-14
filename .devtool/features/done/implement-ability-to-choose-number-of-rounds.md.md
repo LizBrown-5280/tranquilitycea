@@ -1,15 +1,15 @@
 ---
 id: "implement-ability-to-choose-number-of-rounds"
-status: "backlog"
+status: "done"
 priority: "medium"
 assignee: null
 epic: null
 dueDate: null
 created: "2026-08-31T08:00:00.000Z"
-modified: "2026-09-14T16:41:24.437Z"
-completedAt: null
+modified: "2026-09-14T18:21:05.128Z"
+completedAt: "2026-09-14T18:21:05.128Z"
 labels: ["feature'"]
-order: "a1"
+order: "a5"
 ---
 # Implement Ability to Choose Number of Rounds
 
